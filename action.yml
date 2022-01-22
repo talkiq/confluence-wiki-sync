@@ -1,0 +1,28 @@
+name: Confluence Docs Sync
+description: Watches for changes in doc files and uploads modified files to Confluence Cloud
+branding:
+  icon: upload-cloud
+  color: purple
+inputs:
+  ignored-folders:
+    description: Space-delimited list of folders to ignore when considering which files to upload
+    required: false
+    default: ''
+  root-page-title:
+    description: Title of the Confluence page files will be uploaded under
+    required: true
+  space-name:
+    description: Name of the Confluence space where files will be uploaded
+    required: true
+  token:
+    description: Token of the user
+    required: true
+  user:
+    description: Username of the token user
+    required: true
+  wiki-base-url:
+    description: Base URL of the Confluence Cloud instance
+    required: true
+runs:
+  using: docker
+  image: Dockerfile

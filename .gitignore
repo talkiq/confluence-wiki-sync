@@ -1,0 +1,9 @@
+# Virtual environment
+venv/
+
+# Vim files
+.lvimrc
+Session.vim
+
+# Secrets file for local testing
+.secrets
