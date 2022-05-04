@@ -34,7 +34,7 @@ two commits and get a list of modified files.
             fetch-depth: 2
 
         - name: Wiki Sync
-          uses: dialpad/confluence-docs-sync@v1
+          uses: talkiq/confluence-docs-sync@v1
           with:
             wiki-base-url: https://example.org
             user: user@domain.tld
@@ -57,7 +57,7 @@ space-separated list:
 .. code-block:: yaml
 
   - name: Wiki Sync
-    uses: dialpad/confluence-docs-sync@v1
+    uses: talkiq/confluence-docs-sync@v1
     with:
       ignored_folders: 'foo/ bar/baz/'
       [...]
