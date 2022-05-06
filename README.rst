@@ -33,12 +33,16 @@ two commits and get a list of modified files.
           with:
             fetch-depth: 2
 
+        - name: Get modified files
+          run: echo "MODIFIED_FILES=`git diff HEAD^ --name-only | xargs`" >> $GITHUB_ENV
+
         - name: Wiki Sync
-          uses: talkiq/confluence-docs-sync@v1
+          uses: talkiq/confluence-wiki-sync@v1
           with:
             wiki-base-url: https://example.org
             user: user@domain.tld
             token: ${{ secrets.TOKEN }}
+            modified-files: ${{ env.MODIFIED_FILES }}
             space-name: CoolSpace
             root-page-title: Root page
 
@@ -57,7 +61,7 @@ space-separated list:
 .. code-block:: yaml
 
   - name: Wiki Sync
-    uses: talkiq/confluence-docs-sync@v1
+    uses: talkiq/confluence-wiki-sync@v1
     with:
       ignored_folders: 'foo/ bar/baz/'
       [...]

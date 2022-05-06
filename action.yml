@@ -8,6 +8,9 @@ inputs:
     description: Space-delimited list of folders to ignore when considering which files to upload
     required: false
     default: ''
+  modified-files:
+    description: Space-delimited list of files that have been modified (or added or deleted)
+    required: true
   root-page-title:
     description: Title of the Confluence page files will be uploaded under
     required: true
