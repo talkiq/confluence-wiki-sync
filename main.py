@@ -13,11 +13,8 @@ import atlassian
 import pypandoc
 
 
-def get_files_to_sync() -> List[str]:
-    with subprocess.Popen(['git', 'diff', 'HEAD^', '--name-only'],
-                          stdout=subprocess.PIPE) as proc:
-        changed_files = proc.communicate()[0].rstrip().decode('utf-8')
-        return [f for f in changed_files.split('\n') if should_sync_file(f)]
+def get_files_to_sync(changed_files: str) -> List[str]:
+    return [f for f in changed_files.split() if should_sync_file(f)]
 
 
 def should_sync_file(file_name: str) -> bool:
@@ -156,7 +153,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
     try:
-        files_to_sync = get_files_to_sync()
+        files_to_sync = get_files_to_sync(os.environ['INPUT_MODIFIED-FILES'])
         logging.info('Files to be synced: %s', files_to_sync)
 
         had_sync_errors = sync_files(files_to_sync)
