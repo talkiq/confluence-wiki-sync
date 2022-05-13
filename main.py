@@ -27,6 +27,9 @@ def should_sync_file(file_name: str) -> bool:
         if not ignored_folder:
             continue  # Ignore extra spaces
 
+        if not ignored_folder.endswith('/'):
+            ignored_folder = ignored_folder + '/'
+
         if(len(os.path.commonprefix([ignored_folder, file_name]))
                 == len(ignored_folder)):
             logging.info('Skipping file %s because folder %s is ignored',
