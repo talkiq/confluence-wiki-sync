@@ -6,10 +6,10 @@ import tempfile
 import os
 from unittest import mock
 
-import main
+import wiki_sync
 
 
-@mock.patch('main.get_repository_root')
+@mock.patch('wiki_sync.get_repository_root')
 @mock.patch('atlassian.Confluence')
 def test_page_is_created_under_correct_root(mock_wiki, get_repo_root_mock):
     file_name = 'hello.md'
@@ -36,7 +36,7 @@ def test_page_is_created_under_correct_root(mock_wiki, get_repo_root_mock):
         os.environ['INPUT_USER'] = ''
         os.environ['INPUT_WIKI-BASE-URL'] = ''
 
-        main.sync_files([file_name])
+        wiki_sync.sync_files([file_name])
 
         wiki_client.get_page_id.assert_called_once_with(
                 space_name, root_page_title)
