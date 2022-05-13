@@ -13,6 +13,10 @@ wiki page, containing a list of their children pages. The name of each page is
 the path of the file in the repo, to guarantee uniqueness within the Confluence
 space.
 
+.. image::
+   https://circleci.com/gh/talkiq/confluence-wiki-sync/tree/main.svg?style=svg
+   :target: https://circleci.com/gh/talkiq/confluence-wiki-sync/tree/main
+
 ---------------
 Getting started
 ---------------
@@ -83,10 +87,20 @@ with ``pre-commit install``.
 The same linters run in CI, and you can also run them with ``pre-commit run
 --all-files``.
 
+Automated tests
+===============
+
+Tests are run using `pytest <https://docs.pytest.org>`_:
+
+.. code-block:: bash
+
+  pip install pytest
+  pytest
+
 Local run
 =========
 
-You can test locally using `act <https://github.com/nektos/act>`_.
+You can run the action locally using `act <https://github.com/nektos/act>`_.
 
 Copy the simple configuration above, remove the Checkout step, and update the
 ``uses:`` line to be ``uses: ./``.
