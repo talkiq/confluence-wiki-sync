@@ -3,10 +3,25 @@ version: 2.1
 orbs:
   linter: talkiq/linter@2.0.0
 
+jobs:
+  run-tests:
+    docker:
+      - image: pandoc/core:latest-ubuntu
+    steps:
+      - checkout
+      - run: apt update && apt install -y pip
+      - run: pip install -r requirements.txt
+      - run: pip install pytest
+      - run: pytest
+
 workflows:
   run-jobs:
     jobs:
       - linter/pre-commit:
+          filters:
+            tags:
+              only: /.*/
+      - run-tests:
           filters:
             tags:
               only: /.*/

@@ -6,7 +6,7 @@ RUN apk update && apk add git && apk add pandoc --repository=http://dl-cdn.alpin
 COPY requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
 
-COPY main.py /main.py
+COPY wiki_sync.py /wiki_sync.py
 
 ENTRYPOINT ["python3"]
-CMD ["/main.py"]
+CMD ["/wiki_sync.py"]

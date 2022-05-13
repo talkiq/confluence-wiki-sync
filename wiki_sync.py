@@ -27,6 +27,9 @@ def should_sync_file(file_name: str) -> bool:
         if not ignored_folder:
             continue  # Ignore extra spaces
 
+        if not ignored_folder.endswith('/'):
+            ignored_folder = ignored_folder + '/'
+
         if(len(os.path.commonprefix([ignored_folder, file_name]))
                 == len(ignored_folder)):
             logging.info('Skipping file %s because folder %s is ignored',
@@ -57,9 +60,7 @@ def sync_files(files: List[str]) -> bool:
     url_root_for_file = f'https://github.com/{github_repo}/blob/HEAD/'
     repo_name = github_repo.split('/')[1]
 
-    with subprocess.Popen(['git', 'rev-parse', '--show-toplevel'],
-                          stdout=subprocess.PIPE) as proc:
-        repo_root = proc.communicate()[0].rstrip().decode('utf-8')
+    repo_root = get_repository_root()
 
     for file_path in files:
         read_only_warning = (
@@ -102,6 +103,14 @@ def sync_files(files: List[str]) -> bool:
             continue
 
     return had_errors
+
+
+def get_repository_root() -> str:
+    repo_root = ''
+    with subprocess.Popen(['git', 'rev-parse', '--show-toplevel'],
+                          stdout=subprocess.PIPE) as proc:
+        repo_root = proc.communicate()[0].rstrip().decode('utf-8')
+    return repo_root
 
 
 def create_or_update_pages_for_file(wiki_client: atlassian.Confluence,
