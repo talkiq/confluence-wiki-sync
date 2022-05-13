@@ -6,7 +6,7 @@ orbs:
 jobs:
   run-tests:
     docker:
-      - image: python:3.9.12
+      - image: pandoc/core:latest-ubuntu
     steps:
       - checkout
       - run: pip install -r requirements.txt
