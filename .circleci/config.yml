@@ -9,6 +9,7 @@ jobs:
       - image: pandoc/core:latest-ubuntu
     steps:
       - checkout
+      - run: apt update && apt install pip
       - run: pip install -r requirements.txt
       - run: pip install pytest
       - run: pytest
