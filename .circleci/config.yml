@@ -1,0 +1,12 @@
+version: 2.1
+
+orbs:
+  linter: talkiq/linter@2.0.0
+
+workflows:
+  run-jobs:
+    jobs:
+      - linter/pre-commit:
+          filters:
+            tags:
+              only: /.*/
