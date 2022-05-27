@@ -56,6 +56,9 @@ It is recommended to save the Confluence token as a GitHub secret.
 Configuration
 -------------
 
+Optional parameters
+===================
+
 The Getting Started example shows all the required parameters.
 
 Check out `action.yml <./action.yml>`_ to get the list of configuration options.
@@ -69,6 +72,33 @@ space-separated list:
     with:
       ignored_folders: 'foo/ bar/baz/'
       [...]
+
+Manual runs
+===========
+
+Sometimes it can be useful to run the workflow manually for certain files. You
+can add a ``workflow_dispatch`` trigger to your workflow, and get the list of
+files to sync from its input parameter:
+
+.. code-block:: yaml
+
+  workflow_dispatch:  # Manual trigger
+    inputs:
+      files-to-sync:
+        description: 'Space-separated list of files to synchronize'
+        required: true
+        type: string
+
+  [...]
+
+    - name: Get modified files from user input
+      if: github.event_name == 'workflow_dispatch'
+      run: echo "MODIFIED_FILES=${{ github.event.inputs.files-to-sync}}" >> $GITHUB_ENV
+
+    - name: Get modified files from git diff
+      if: github.event_name != 'workflow_dispatch'
+      run: echo "MODIFIED_FILES=`git diff HEAD^ --name-only | xargs`" >> $GITHUB_ENV
+
 
 -----------
 Development
