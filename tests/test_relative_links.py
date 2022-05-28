@@ -38,12 +38,12 @@ def test_http_link(wiki_mock, get_repo_root_mock):
         # Create the doc file with an HTTP link
         doc_path = os.path.join(repo_root, 'new_doc.md')
         with open(doc_path, mode='w', encoding='utf-8') as doc_file:
-            print('Check out this [link](https://example.org)!', file=doc_file)
+            print('Check out this [link](https://example.org)', file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
-        assert output == 'Check out this [link|https://example.org]\\!\n'
+        assert output == 'Check out this [link|https://example.org]\n'
 
 
 def test_link_to_file_in_same_folder(wiki_mock, get_repo_root_mock):
@@ -58,14 +58,14 @@ def test_link_to_file_in_same_folder(wiki_mock, get_repo_root_mock):
         # Create the doc file with a link to the other one
         doc_path = os.path.join(repo_root, 'new_doc.md')
         with open(doc_path, mode='w', encoding='utf-8') as doc_file:
-            contents = f'Check out this [other file]({linked_file_name})!'
+            contents = f'Check out this [other file]({linked_file_name})'
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
         expected_output = (f'Check out this'
-                           f' [other file|{GH_ROOT}{linked_doc_path}]\\!\n')
+                           f' [other file|{GH_ROOT}{linked_doc_path}]\n')
         assert output == expected_output
 
 
@@ -82,14 +82,14 @@ def test_link_to_file_in_child_folder(wiki_mock, get_repo_root_mock):
         # Create the doc file with a link to the other one
         doc_path = os.path.join(repo_root, 'new_doc.md')
         with open(doc_path, mode='w', encoding='utf-8') as doc_file:
-            contents = f'Check out this [other file]({linked_file_name})!'
+            contents = f'Check out this [other file]({linked_file_name})'
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
         expected_output = (f'Check out this'
-                           f' [other file|{GH_ROOT}{linked_doc_path}]\\!\n')
+                           f' [other file|{GH_ROOT}{linked_doc_path}]\n')
         assert output == expected_output
 
 
@@ -106,20 +106,39 @@ def test_link_to_file_in_parent_folder(wiki_mock, get_repo_root_mock):
         os.makedirs(os.path.join(repo_root, 'foo', 'bar'))
         doc_path = os.path.join(repo_root, 'foo/bar/new_doc.md')
         with open(doc_path, mode='w', encoding='utf-8') as doc_file:
-            contents = 'Check out this [other file](../../linked_file.py)!'
+            contents = 'Check out this [other file](../../linked_file.py)'
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
         expected_output = (f'Check out this'
-                           f' [other file|{GH_ROOT}{linked_doc_path}]\\!\n')
+                           f' [other file|{GH_ROOT}{linked_doc_path}]\n')
         assert output == expected_output
 
 
-def test_simplified_link():
+@pytest.mark.xfail(reason='Will be implemented in #19')
+def test_simplified_link(wiki_mock, get_repo_root_mock):
     # Link where the name of the link is the same as the link itself
-    pass  # TODO
+    with tempfile.TemporaryDirectory() as repo_root:
+        get_repo_root_mock.return_value = repo_root
+
+        # Create a file that the doc will link to
+        linked_file_name = 'linked_file.py'
+        linked_doc_path = os.path.join(repo_root, linked_file_name)
+        write_something_to_file(linked_doc_path)
+
+        # Create the doc file with a link to the other one
+        doc_path = os.path.join(repo_root, 'new_doc.md')
+        with open(doc_path, mode='w', encoding='utf-8') as doc_file:
+            contents = f'Check out [{linked_file_name}]({linked_file_name})'
+            print(contents, file=doc_file)
+
+        output = wiki_sync.get_formatted_file_content(
+                wiki_mock, doc_path, GH_ROOT, REPO_NAME)
+
+        expected_link = f'[{linked_file_name}|{GH_ROOT}{linked_doc_path}'
+        assert output == f'Check out {expected_link}\n'
 
 
 def test_link_to_non_existing_file(wiki_mock, get_repo_root_mock):
@@ -129,13 +148,13 @@ def test_link_to_non_existing_file(wiki_mock, get_repo_root_mock):
         # Create the doc file with a link to a non-existing file
         doc_path = os.path.join(repo_root, 'new_doc.md')
         with open(doc_path, mode='w', encoding='utf-8') as doc_file:
-            contents = 'Check out this [other file](non_existing.py)!'
+            contents = 'Check out this [other file](non_existing.py)'
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
-        assert output == 'Check out this [other file|non_existing.py]\\!\n'
+        assert output == 'Check out this [other file|non_existing.py]\n'
 
 
 def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
@@ -160,14 +179,14 @@ def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
         # Create the doc file with a link to the other one
         doc_path = os.path.join(repo_root, 'new_doc.md')
         with open(doc_path, mode='w', encoding='utf-8') as doc_file:
-            contents = f'Check out this [other file]({linked_file_name})!'
+            contents = f'Check out this [other file]({linked_file_name})'
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
         wiki_link = 'http://mywiki.atlassian.net/wiki/spaces/SPACE/pages/123'
-        expected_output = (f'Check out this [other file|{wiki_link}]\\!\n')
+        expected_output = (f'Check out this [other file|{wiki_link}]\n')
         assert output == expected_output
 
 
