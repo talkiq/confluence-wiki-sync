@@ -22,7 +22,8 @@ JIRA_LINK_PATTERN = re.compile(r'\[(.*)\|(.*)\]')
 JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[(.*)\]')
 # The format of an image in JIRA markdown is
 # !filename.png! or !some_pic.png|alt=image!
-JIRA_IMG_PATTERN = re.compile(r'\!(.*)[|!]')
+JIRA_SIMPLE_IMG_PATTERN = re.compile(r'\!(.*)!')
+JIRA_IMG_PATTERN_WITH_PARAMS = re.compile(r'\!(.*)|(.*)!')
 
 
 class RelativeLinkType(enum.Enum):
@@ -158,23 +159,40 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
     links.extend(
             _extract_relative_links(file_path, contents,
                                     JIRA_UNNAMED_LINK_PATTERN))
+    links.extend(
+            _extract_relative_links(file_path, contents,
+                                    JIRA_SIMPLE_IMG_PATTERN))
+    links.extend(
+            _extract_relative_links(file_path, contents,
+                                    JIRA_IMG_PATTERN_WITH_PARAMS))
 
     for link in links:
         # Find absolute link
-        wiki_page_info = wiki_client.get_page_by_title(
-                os.environ['INPUT_SPACE-NAME'],
-                f'{repo_name}/{link.target_path}')
-        if wiki_page_info:
-            # The link is to a file that has a Confluence page
-            # Let's link to the page directly
-            target_page_url = (os.environ['INPUT_WIKI-BASE-URL']
-                               + '/wiki' + wiki_page_info['_links']['webui'])
-            link.absolute_link = target_page_url
+        if link.link_type == RelativeLinkType.GENERIC:
+            wiki_page_info = wiki_client.get_page_by_title(
+                    os.environ['INPUT_SPACE-NAME'],
+                    f'{repo_name}/{link.target_path}')
+            if wiki_page_info:
+                # The link is to a file that has a Confluence page
+                # Let's link to the page directly
+                target_page_url = (
+                        os.environ['INPUT_WIKI-BASE-URL']
+                        + '/wiki' + wiki_page_info['_links']['webui'])
+                link.absolute_link = target_page_url
+            else:
+                # No existing Confluence page - link to GitHub
+                link.absolute_link = gh_root + link.target_path
+
+        elif link.link_type == RelativeLinkType.IMAGE:
+            # TODO find real link :)
+            link.absolute_link = (
+                    'https://blog.tbicom.com/hs-fs/hubfs/LOGOS/'
+                    'Dialpad%20logo.png?width=400&name=Dialpad%20logo.png')
         else:
-            # No existing Confluence page - link to GitHub
-            link.absolute_link = gh_root + link.target_path
+            raise Exception(f'Unexpected relative link type {link.link_type}')
 
         # Replace relative links
+        # TODO make that a method
         if link.link_type == RelativeLinkType.GENERIC:
             if link.text == link.relative_link:
                 # This means the JIRA markdown is simply [link]
@@ -185,6 +203,16 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
             else:  # Normal [text|link] link
                 contents = contents.replace(
                         f'|{link.relative_link}]', f'|{link.absolute_link}]')
+        elif link.link_type == RelativeLinkType.IMAGE:
+            if link.text == link.relative_link:
+                # This means the JIRA markdown is simply !file.ext!
+                # Keep the text and update the link
+                contents = contents.replace(
+                        f'!{link.relative_link}!', f'!{link.absolute_link}!')
+            else:
+                # Image with parameters, like !some_pic.png|alt=image!
+                contents = contents.replace(
+                        f'!{link.relative_link}|', f'!{link.absolute_link}|')
 
     return contents
 
@@ -195,12 +223,17 @@ def _extract_relative_links(file_path: str, file_contents: str,
 
     for matching_groups in re.findall(pattern, file_contents):
         text = rel_link = ''
+        link_type = RelativeLinkType.GENERIC
         if pattern == JIRA_LINK_PATTERN:
             text = matching_groups[0]
             rel_link = matching_groups[1]
-        if pattern == JIRA_UNNAMED_LINK_PATTERN:
+        elif pattern == JIRA_UNNAMED_LINK_PATTERN:
             text = rel_link = matching_groups
-        elif pattern == JIRA_IMG_PATTERN:
+        elif pattern == JIRA_SIMPLE_IMG_PATTERN:
+            link_type = RelativeLinkType.IMAGE
+            text = rel_link = matching_groups
+        elif pattern == JIRA_IMG_PATTERN_WITH_PARAMS:
+            link_type = RelativeLinkType.IMAGE
             text = matching_groups[1]
             rel_link = matching_groups[0]
         else:
@@ -215,7 +248,7 @@ def _extract_relative_links(file_path: str, file_contents: str,
         if not os.path.exists(target_path):  # Not actually a relative link
             continue
 
-        links.append(RelativeLink(link_type=RelativeLinkType.GENERIC,
+        links.append(RelativeLink(link_type=link_type,
                                   text=text,
                                   relative_link=rel_link,
                                   target_path=target_path,
