@@ -117,7 +117,6 @@ def test_link_to_file_in_parent_folder(wiki_mock, get_repo_root_mock):
         assert output == expected_output
 
 
-@pytest.mark.xfail(reason='Will be implemented in #19')
 def test_simplified_link(wiki_mock, get_repo_root_mock):
     # Link where the name of the link is the same as the link itself
     with tempfile.TemporaryDirectory() as repo_root:
@@ -137,7 +136,7 @@ def test_simplified_link(wiki_mock, get_repo_root_mock):
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
-        expected_link = f'[{linked_file_name}|{GH_ROOT}{linked_doc_path}'
+        expected_link = f'[{linked_file_name}|{GH_ROOT}{linked_doc_path}]'
         assert output == f'Check out {expected_link}\n'
 
 

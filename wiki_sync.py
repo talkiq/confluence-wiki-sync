@@ -17,9 +17,12 @@ import pypandoc
 
 
 # The format of a link in JIRA markdown is [link name|link]
-# TODO handle links like [link], which happen when the link name is the same as
-# the link itself
 JIRA_LINK_PATTERN = re.compile(r'\[(.*)\|(.*)\]')
+# If the link doesn't have a name, then it's simply [link]
+JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[(.*)\]')
+# The format of an image in JIRA markdown is
+# !filename.png! or !some_pic.png|alt=image!
+JIRA_IMG_PATTERN = re.compile(r'\!(.*)[|!]')
 
 
 class RelativeLinkType(enum.Enum):
@@ -31,8 +34,9 @@ class RelativeLinkType(enum.Enum):
 class RelativeLink:
     """Represents a relative link and how to convert it to an absolute link"""
     link_type: RelativeLinkType
-    text: str
+    text: str  # Text associated with the link (link name, alt text, ...)
     relative_link: str
+    target_path: str  # Path of the file being linked to
     absolute_link: str
 
 
@@ -149,7 +153,59 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                             ) -> str:
     links: List[RelativeLink] = []
 
-    for text, rel_link in re.findall(JIRA_LINK_PATTERN, contents):
+    links.extend(
+            _extract_relative_links(file_path, contents, JIRA_LINK_PATTERN))
+    links.extend(
+            _extract_relative_links(file_path, contents,
+                                    JIRA_UNNAMED_LINK_PATTERN))
+
+    for link in links:
+        # Find absolute link
+        wiki_page_info = wiki_client.get_page_by_title(
+                os.environ['INPUT_SPACE-NAME'],
+                f'{repo_name}/{link.target_path}')
+        if wiki_page_info:
+            # The link is to a file that has a Confluence page
+            # Let's link to the page directly
+            target_page_url = (os.environ['INPUT_WIKI-BASE-URL']
+                               + '/wiki' + wiki_page_info['_links']['webui'])
+            link.absolute_link = target_page_url
+        else:
+            # No existing Confluence page - link to GitHub
+            link.absolute_link = gh_root + link.target_path
+
+        # Replace relative links
+        if link.link_type == RelativeLinkType.GENERIC:
+            if link.text == link.relative_link:
+                # This means the JIRA markdown is simply [link]
+                # Keep the text and update the link
+                contents = contents.replace(
+                        f'[{link.relative_link}]',
+                        f'[{link.text}|{link.absolute_link}]')
+            else:  # Normal [text|link] link
+                contents = contents.replace(
+                        f'|{link.relative_link}]', f'|{link.absolute_link}]')
+
+    return contents
+
+
+def _extract_relative_links(file_path: str, file_contents: str,
+                            pattern: re.Pattern) -> List[RelativeLink]:
+    links: List[RelativeLink] = []
+
+    for matching_groups in re.findall(pattern, file_contents):
+        text = rel_link = ''
+        if pattern == JIRA_LINK_PATTERN:
+            text = matching_groups[0]
+            rel_link = matching_groups[1]
+        if pattern == JIRA_UNNAMED_LINK_PATTERN:
+            text = rel_link = matching_groups
+        elif pattern == JIRA_IMG_PATTERN:
+            text = matching_groups[1]
+            rel_link = matching_groups[0]
+        else:
+            raise Exception(f'Unexpected link pattern {pattern}')
+
         # Most links are HTTP(S) - don't waste time with them
         if rel_link.startswith('http'):
             continue
@@ -159,30 +215,13 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
         if not os.path.exists(target_path):  # Not actually a relative link
             continue
 
-        link = RelativeLink(link_type=RelativeLinkType.GENERIC,
-                            text=text, relative_link=rel_link,
-                            absolute_link='')
+        links.append(RelativeLink(link_type=RelativeLinkType.GENERIC,
+                                  text=text,
+                                  relative_link=rel_link,
+                                  target_path=target_path,
+                                  absolute_link=''))
 
-        wiki_page_info = wiki_client.get_page_by_title(
-                os.environ['INPUT_SPACE-NAME'], f'{repo_name}/{target_path}')
-        if wiki_page_info:
-            # The link is to a file that has a Confluence page
-            # Let's link to the page directly
-            target_page_url = (os.environ['INPUT_WIKI-BASE-URL']
-                               + '/wiki' + wiki_page_info['_links']['webui'])
-            link.absolute_link = target_page_url
-        else:
-            # No existing Confluence page - link to GitHub
-            link.absolute_link = gh_root + target_path
-
-        links.append(link)
-
-    # Replace relative links
-    for link in links:
-        contents = contents.replace(
-                f'|{link.relative_link}]', f'|{link.absolute_link}]')
-
-    return contents
+    return links
 
 
 def get_repository_root() -> str:
