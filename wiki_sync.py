@@ -19,7 +19,7 @@ import pypandoc
 # The format of a link in JIRA markdown is [link name|link]
 JIRA_LINK_PATTERN = re.compile(r'\[(.*)\|(.*)\]')
 # If the link doesn't have a name, then it's simply [link]
-JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[(.*)\]')
+JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[([^|]*)\]')
 # The format of an image in JIRA markdown is
 # !filename.png! or !some_pic.png|alt=image!
 JIRA_SIMPLE_IMG_PATTERN = re.compile(r'\!(.*)!')
@@ -192,27 +192,7 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
             raise Exception(f'Unexpected relative link type {link.link_type}')
 
         # Replace relative links
-        # TODO make that a method
-        if link.link_type == RelativeLinkType.GENERIC:
-            if link.text == link.relative_link:
-                # This means the JIRA markdown is simply [link]
-                # Keep the text and update the link
-                contents = contents.replace(
-                        f'[{link.relative_link}]',
-                        f'[{link.text}|{link.absolute_link}]')
-            else:  # Normal [text|link] link
-                contents = contents.replace(
-                        f'|{link.relative_link}]', f'|{link.absolute_link}]')
-        elif link.link_type == RelativeLinkType.IMAGE:
-            if link.text == link.relative_link:
-                # This means the JIRA markdown is simply !file.ext!
-                # Keep the text and update the link
-                contents = contents.replace(
-                        f'!{link.relative_link}!', f'!{link.absolute_link}!')
-            else:
-                # Image with parameters, like !some_pic.png|alt=image!
-                contents = contents.replace(
-                        f'!{link.relative_link}|', f'!{link.absolute_link}|')
+        contents = _replace_relative_link(contents, link)
 
     return contents
 
@@ -255,6 +235,35 @@ def _extract_relative_links(file_path: str, file_contents: str,
                                   absolute_link=''))
 
     return links
+
+
+def _replace_relative_link(text: str, link: RelativeLink) -> str:
+    if link.link_type == RelativeLinkType.GENERIC:
+        if link.text == link.relative_link:
+            # This means the JIRA markdown is simply [link]
+            # Keep the text and update the link
+            return text.replace(
+                    f'[{link.relative_link}]',
+                    f'[{link.text}|{link.absolute_link}]')
+        else:  # Normal [text|link] link
+            return text.replace(
+                    f'|{link.relative_link}]', f'|{link.absolute_link}]')
+
+    elif link.link_type == RelativeLinkType.IMAGE:
+        if link.text == link.relative_link:
+            # This means the JIRA markdown is simply !file.ext!
+            # Keep the text and update the link
+            return text.replace(
+                    f'!{link.relative_link}!', f'!{link.absolute_link}!')
+        else:
+            # Image with parameters, like !some_pic.png|alt=image!
+            return text.replace(
+                    f'!{link.relative_link}|', f'!{link.absolute_link}|')
+
+    else:
+        logging.warning('Unexpected link type %s -returning text as is.',
+                        link.link_type)
+        return text
 
 
 def get_repository_root() -> str:
