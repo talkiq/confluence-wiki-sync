@@ -6,24 +6,15 @@ uploads them to Confluence
 
 import logging
 import os
-import re
 import subprocess
 import sys
-from typing import Dict, List
 
 import atlassian
-import pypandoc
+
+import content_converter
 
 
-# The format of a link in JIRA markdown is [link name|link]
-# We only need a capture group for the link itself
-# TODO handle links like [link], which happen when the link name is the same as
-# the link itself
-JIRA_LINK_PATTERN = re.compile(r'\[[^|\n]+\|([^|\n]+)\]')
-JIRA_MACRO_PATTERN = re.compile(r'\${[a-zA-Z_-]*}')
-
-
-def get_files_to_sync(changed_files: str) -> List[str]:
+def get_files_to_sync(changed_files: str) -> list[str]:
     return [f for f in changed_files.split() if should_sync_file(f)]
 
 
@@ -53,7 +44,7 @@ def should_sync_file(file_name: str) -> bool:
     return True
 
 
-def sync_files(files: List[str]) -> bool:
+def sync_files(files: list[str]) -> bool:
     had_errors = False
 
     wiki_client = atlassian.Confluence(
@@ -77,6 +68,10 @@ def sync_files(files: List[str]) -> bool:
 
     repo_root = get_repository_root()
 
+    converter = content_converter.ContentConverter(
+        wiki_client, repo_root, url_root_for_file, repo_name
+    )
+
     for file_path in files:
         read_only_warning = (
             '{info:title=Imported content|icon=true}'
@@ -90,7 +85,7 @@ def sync_files(files: List[str]) -> bool:
         absolute_file_path = os.path.join(repo_root, file_path)
 
         if not os.path.exists(absolute_file_path):
-            # TODO delete corresponding wiki page
+            # TODO delete corresponding wiki page (#9)
             logging.warning(
                 'File %s not found. Deleting a wiki page is not currently'
                 ' supported, so you will have to delete it manually',
@@ -99,9 +94,7 @@ def sync_files(files: List[str]) -> bool:
             continue
 
         try:
-            formatted_content = get_formatted_file_content(
-                wiki_client, repo_root, file_path, url_root_for_file, repo_name
-            )
+            formatted_content = converter.convert_file_contents(file_path)
             content = read_only_warning + formatted_content
         except Exception:
             logging.exception('Error converting file %s:', absolute_file_path)
@@ -109,7 +102,7 @@ def sync_files(files: List[str]) -> bool:
             continue
 
         try:
-            create_or_update_pages_for_file(
+            page_id = create_or_update_pages_for_file(
                 wiki_client, root_page_id, repo_name, file_path, content
             )
         except Exception:
@@ -117,75 +110,21 @@ def sync_files(files: List[str]) -> bool:
             had_errors = True
             continue
 
+        # Image attachments are decided when parsing the JIRA markdown contents of the
+        # file. If the file is new in the latest commit, its wiki page hadn't been
+        # created at that stage. So we go back and attach these images now.
+        for attachment_path in converter.files_to_attach_to_last_page:
+            try:
+                logging.info('Attaching file %s to page %s', attachment_path, page_id)
+                wiki_client.attach_file(filename=attachment_path, page_id=page_id)
+            except Exception:
+                logging.exception(
+                    'Error attaching %s to %s:', attachment_path, absolute_file_path
+                )
+                had_errors = True
+                continue
+
     return had_errors
-
-
-def get_formatted_file_content(
-    wiki_client: atlassian.Confluence,
-    repo_root: str,
-    file_path: str,
-    gh_root: str,
-    repo_name: str,
-) -> str:
-    """
-    Takes the absolute path of a file and returns its contents formatted as
-    JIRA markdown.
-
-    Updates relative links to point to a Confluence page if it exists, or to a
-    GitHub page.
-    """
-    # keys are relative links; values are what they should be replaced with
-    links_to_replace: Dict[str, str] = {}
-    # keys are macros in XHTML; values are what they should be replaced with
-    macros_to_replace: Dict[str, str] = {}
-
-    absolute_file_path = os.path.join(repo_root, file_path)
-    formated_file_contents = pypandoc.convert_file(absolute_file_path, 'jira')
-
-    for link in re.findall(JIRA_LINK_PATTERN, formated_file_contents):
-        # Most links are HTTP - don't waste time with them
-        if link.startswith('http'):
-            continue
-
-        target_path = os.path.join(os.path.split(absolute_file_path)[0], link)
-        target_path = os.path.normpath(target_path)
-        if not os.path.exists(target_path):  # Not actually a relative link
-            continue
-
-        target_from_root = os.path.relpath(target_path, start=repo_root)
-
-        wiki_page_info = wiki_client.get_page_by_title(
-            os.environ['INPUT_SPACE-NAME'], f'{repo_name}/{target_from_root}'
-        )
-        if wiki_page_info:
-            # The link is to a file that has a Confluence page
-            # Let's link to the page directly
-            target_page_url = (
-                os.environ['INPUT_WIKI-BASE-URL']
-                + '/wiki'
-                + wiki_page_info['_links']['webui']
-            )
-            links_to_replace[link] = target_page_url
-        else:
-            # No existing Confluence page - link to GitHub
-            links_to_replace[link] = gh_root + target_from_root
-
-    # Replace relative links
-    for relative_link, new_link in links_to_replace.items():
-        formated_file_contents = formated_file_contents.replace(
-            f'|{relative_link}]', f'|{new_link}]'
-        )
-
-    # find macros and escape the curly braces
-    for macro in re.findall(JIRA_MACRO_PATTERN, formated_file_contents):
-        macros_to_replace[macro] = macro.replace('{', r'\{').replace('}', r'\}')
-
-    for macro, escaped_macro in macros_to_replace.items():
-        formated_file_contents = formated_file_contents.replace(
-            f'{macro}', f'{escaped_macro}'
-        )
-
-    return formated_file_contents
 
 
 def get_repository_root() -> str:
@@ -203,7 +142,8 @@ def create_or_update_pages_for_file(
     repo_name: str,
     file_name: str,
     content: str,
-) -> None:
+) -> str:
+    """Returns the ID of the created/updated page"""
     # The git docs live in a tree under the root page, with the same
     # tree structure as in the git repo.
     # We need to navigate the tree to find where the page lives,
@@ -239,13 +179,17 @@ def create_or_update_pages_for_file(
     title = f'{repo_name}/{file_name}'
     logging.info('Creating or updating page %s under root %s', title, current_root_id)
     # TODO Consider making the page read-only
-    wiki_client.update_or_create(
+    response = wiki_client.update_or_create(
         parent_id=current_root_id, title=title, body=content, representation='wiki'
     )
+    return response['id']
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    logging.getLogger('atlassian.confluence').setLevel(logging.INFO)
+    logging.getLogger('atlassian.rest_client').setLevel(logging.INFO)
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.INFO)
 
     try:
         files_to_sync = get_files_to_sync(os.environ['INPUT_MODIFIED-FILES'])
