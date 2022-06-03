@@ -5,12 +5,20 @@ uploads them to Confluence
 """
 import logging
 import os
+import re
 import subprocess
 import sys
-from typing import List
+from typing import Dict, List
 
 import atlassian
 import pypandoc
+
+
+# The format of a link in JIRA markdown is [link name|link]
+# We only need a capture group for the link itself
+# TODO handle links like [link], which happen when the link name is the same as
+# the link itself
+JIRA_LINK_PATTERN = re.compile(r'\[.*\|(.*)\]')
 
 
 def get_files_to_sync(changed_files: str) -> List[str]:
@@ -66,8 +74,7 @@ def sync_files(files: List[str]) -> bool:
         read_only_warning = (
             '{info:title=Imported content|icon=true}'
             f'This content has been imported from the {repo_name} repository.'
-            "\nRelative links don't yet work as expected.\n"
-            'You can find (and modify) the original at'
+            '\nYou can find (and modify) the original at'
             f' {url_root_for_file + file_path}.{{info}}\n'
             '{warning:title=Do not update this page directly|icon=true}'
             'Your modifications would be lost the next time the source file'
@@ -83,12 +90,10 @@ def sync_files(files: List[str]) -> bool:
             continue
 
         try:
-            # TODO detect and update relative links so they point to the
-            # corresponding JIRA page if it exists, or the GitHub file
-            jira_file_contents = pypandoc.convert_file(absolute_file_path,
-                                                       'jira')
-
-            content = read_only_warning + jira_file_contents
+            formatted_content = get_formatted_file_content(
+                    wiki_client, absolute_file_path, url_root_for_file,
+                    repo_name)
+            content = read_only_warning + formatted_content
         except Exception:
             logging.exception('Error converting file %s:', absolute_file_path)
             had_errors = True
@@ -103,6 +108,51 @@ def sync_files(files: List[str]) -> bool:
             continue
 
     return had_errors
+
+
+def get_formatted_file_content(wiki_client: atlassian.Confluence,
+                               file_path: str, gh_root: str, repo_name: str
+                               ) -> str:
+    """
+    Takes the absolute path of a file and returns its contents formatted as
+    JIRA markdown.
+
+    Updates relative links to point to a Confluence page if it exists, or to a
+    GitHub page.
+    """
+    # keys are relative links; values are what they should be replaced with
+    links_to_replace: Dict[str, str] = {}
+
+    formated_file_contents = pypandoc.convert_file(file_path, 'jira')
+
+    for link in re.findall(JIRA_LINK_PATTERN, formated_file_contents):
+        # Most links are HTTP - don't waste time with them
+        if link.startswith('http'):
+            continue
+
+        target_path = os.path.join(os.path.split(file_path)[0], link)
+        target_path = os.path.normpath(target_path)
+        if not os.path.exists(target_path):  # Not actually a relative link
+            continue
+
+        wiki_page_info = wiki_client.get_page_by_title(
+                os.environ['INPUT_SPACE-NAME'], f'{repo_name}/{target_path}')
+        if wiki_page_info:
+            # The link is to a file that has a Confluence page
+            # Let's link to the page directly
+            target_page_url = (os.environ['INPUT_WIKI-BASE-URL']
+                               + '/wiki' + wiki_page_info['_links']['webui'])
+            links_to_replace[link] = target_page_url
+        else:
+            # No existing Confluence page - link to GitHub
+            links_to_replace[link] = gh_root + target_path
+
+    # Replace relative links
+    for relative_link, new_link in links_to_replace.items():
+        formated_file_contents = formated_file_contents.replace(
+                f'|{relative_link}]', f'|{new_link}]')
+
+    return formated_file_contents
 
 
 def get_repository_root() -> str:
