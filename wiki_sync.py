@@ -3,22 +3,37 @@
 This tool looks for modified doc files, transforms them into JIRA markdown and
 uploads them to Confluence
 """
+import dataclasses
+import enum
 import logging
 import os
 import re
 import subprocess
 import sys
-from typing import Dict, List
+from typing import List
 
 import atlassian
 import pypandoc
 
 
 # The format of a link in JIRA markdown is [link name|link]
-# We only need a capture group for the link itself
 # TODO handle links like [link], which happen when the link name is the same as
 # the link itself
-JIRA_LINK_PATTERN = re.compile(r'\[.*\|(.*)\]')
+JIRA_LINK_PATTERN = re.compile(r'\[(.*)\|(.*)\]')
+
+
+class RelativeLinkType(enum.Enum):
+    GENERIC = 0  # [text|link] or [link]
+    IMAGE = 1  # !file.ext|alt=text! or !file.ext!
+
+
+@dataclasses.dataclass
+class RelativeLink:
+    """Represents a relative link and how to convert it to an absolute link"""
+    link_type: RelativeLinkType
+    text: str
+    relative_link: str
+    absolute_link: str
 
 
 def get_files_to_sync(changed_files: str) -> List[str]:
@@ -120,20 +135,33 @@ def get_formatted_file_content(wiki_client: atlassian.Confluence,
     Updates relative links to point to a Confluence page if it exists, or to a
     GitHub page.
     """
-    # keys are relative links; values are what they should be replaced with
-    links_to_replace: Dict[str, str] = {}
 
     formated_file_contents = pypandoc.convert_file(file_path, 'jira')
 
-    for link in re.findall(JIRA_LINK_PATTERN, formated_file_contents):
-        # Most links are HTTP - don't waste time with them
-        if link.startswith('http'):
+    formated_file_contents = _replace_relative_links(
+            wiki_client, file_path, formated_file_contents, gh_root, repo_name)
+
+    return formated_file_contents
+
+
+def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
+                            contents: str, gh_root: str, repo_name: str
+                            ) -> str:
+    links: List[RelativeLink] = []
+
+    for text, rel_link in re.findall(JIRA_LINK_PATTERN, contents):
+        # Most links are HTTP(S) - don't waste time with them
+        if rel_link.startswith('http'):
             continue
 
-        target_path = os.path.join(os.path.split(file_path)[0], link)
+        target_path = os.path.join(os.path.split(file_path)[0], rel_link)
         target_path = os.path.normpath(target_path)
         if not os.path.exists(target_path):  # Not actually a relative link
             continue
+
+        link = RelativeLink(link_type=RelativeLinkType.GENERIC,
+                            text=text, relative_link=rel_link,
+                            absolute_link='')
 
         wiki_page_info = wiki_client.get_page_by_title(
                 os.environ['INPUT_SPACE-NAME'], f'{repo_name}/{target_path}')
@@ -142,17 +170,19 @@ def get_formatted_file_content(wiki_client: atlassian.Confluence,
             # Let's link to the page directly
             target_page_url = (os.environ['INPUT_WIKI-BASE-URL']
                                + '/wiki' + wiki_page_info['_links']['webui'])
-            links_to_replace[link] = target_page_url
+            link.absolute_link = target_page_url
         else:
             # No existing Confluence page - link to GitHub
-            links_to_replace[link] = gh_root + target_path
+            link.absolute_link = gh_root + target_path
+
+        links.append(link)
 
     # Replace relative links
-    for relative_link, new_link in links_to_replace.items():
-        formated_file_contents = formated_file_contents.replace(
-                f'|{relative_link}]', f'|{new_link}]')
+    for link in links:
+        contents = contents.replace(
+                f'|{link.relative_link}]', f'|{link.absolute_link}]')
 
-    return formated_file_contents
+    return contents
 
 
 def get_repository_root() -> str:
