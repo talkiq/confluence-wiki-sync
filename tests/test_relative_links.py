@@ -64,7 +64,7 @@ def test_link_to_file_in_same_folder(wiki_mock, get_repo_root_mock):
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
-        expected_output = (f'Check out this'
+        expected_output = ('Check out this'
                            f' [other file|{GH_ROOT}{linked_doc_path}]\n')
         assert output == expected_output
 
@@ -88,7 +88,7 @@ def test_link_to_file_in_child_folder(wiki_mock, get_repo_root_mock):
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
-        expected_output = (f'Check out this'
+        expected_output = ('Check out this'
                            f' [other file|{GH_ROOT}{linked_doc_path}]\n')
         assert output == expected_output
 
@@ -112,7 +112,7 @@ def test_link_to_file_in_parent_folder(wiki_mock, get_repo_root_mock):
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
-        expected_output = (f'Check out this'
+        expected_output = ('Check out this'
                            f' [other file|{GH_ROOT}{linked_doc_path}]\n')
         assert output == expected_output
 
@@ -187,6 +187,34 @@ def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
         wiki_link = 'http://mywiki.atlassian.net/wiki/spaces/SPACE/pages/123'
         expected_output = (f'Check out this [other file|{wiki_link}]\n')
         assert output == expected_output
+
+
+def test_simple_link_to_image(wiki_mock, get_repo_root_mock):
+    with tempfile.TemporaryDirectory() as repo_root:
+        get_repo_root_mock.return_value = repo_root
+
+        # Create a file that the doc will link to
+        linked_file_name = 'cool_image.png'
+        linked_doc_path = os.path.join(repo_root, linked_file_name)
+        # The file isn't actually an image, but that's not important
+        write_something_to_file(linked_doc_path)
+
+        # Create the doc file with a link to the other one
+        doc_path = os.path.join(repo_root, 'new_doc.md')
+        with open(doc_path, mode='w', encoding='utf-8') as doc_file:
+            contents = f'Check out ![]({linked_file_name})'
+            print(contents, file=doc_file)
+
+        output = wiki_sync.get_formatted_file_content(
+                wiki_mock, doc_path, GH_ROOT, REPO_NAME)
+
+        expected_output = ('Check out '
+                           f' !notthis!\n')
+        assert output == expected_output
+
+
+def test_link_to_image_with_params(wiki_mock, get_repo_root_mock):
+    del wiki_mock, get_repo_root_mock
 
 
 def write_something_to_file(file_path: str) -> None:

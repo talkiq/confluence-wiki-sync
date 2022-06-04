@@ -36,9 +36,9 @@ class RelativeLink:
     """Represents a relative link and how to convert it to an absolute link"""
     link_type: RelativeLinkType
     text: str  # Text associated with the link (link name, alt text, ...)
-    relative_link: str
+    original_link: str
     target_path: str  # Path of the file being linked to
-    absolute_link: str
+    wiki_link: str
 
 
 def get_files_to_sync(changed_files: str) -> List[str]:
@@ -178,16 +178,33 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                 target_page_url = (
                         os.environ['INPUT_WIKI-BASE-URL']
                         + '/wiki' + wiki_page_info['_links']['webui'])
-                link.absolute_link = target_page_url
+                link.wiki_link = target_page_url
             else:
                 # No existing Confluence page - link to GitHub
-                link.absolute_link = gh_root + link.target_path
+                link.wiki_link = gh_root + link.target_path
 
         elif link.link_type == RelativeLinkType.IMAGE:
-            # TODO find real link :)
-            link.absolute_link = (
-                    'https://blog.tbicom.com/hs-fs/hubfs/LOGOS/'
-                    'Dialpad%20logo.png?width=400&name=Dialpad%20logo.png')
+            page_id = wiki_client.get_page_id(
+                    os.environ['INPUT_SPACE-NAME'],
+                    f'{repo_name}/{file_path}')
+            _, file_name = os.path.split(link.target_path)
+
+            # TODO This doesn't handle the case of a doc file including two
+            # different images with the same name
+            attachments = wiki_client.get_attachments_from_content(
+                    page_id, filename=link.target_path)['results']
+
+            if attachments:
+                # TODO Figure out whether we want to update the image
+                # The API doesn't tell us when the file was last updated, so we
+                # can't compare that to the last commit on that file
+                pass
+            else:
+                wiki_client.attach_file(
+                        filename=link.target_path, page_id=page_id)
+
+            link.wiki_link = file_name
+
         else:
             raise Exception(f'Unexpected relative link type {link.link_type}')
 
@@ -230,35 +247,35 @@ def _extract_relative_links(file_path: str, file_contents: str,
 
         links.append(RelativeLink(link_type=link_type,
                                   text=text,
-                                  relative_link=rel_link,
+                                  original_link=rel_link,
                                   target_path=target_path,
-                                  absolute_link=''))
+                                  wiki_link=''))
 
     return links
 
 
 def _replace_relative_link(text: str, link: RelativeLink) -> str:
     if link.link_type == RelativeLinkType.GENERIC:
-        if link.text == link.relative_link:
+        if link.text == link.original_link:
             # This means the JIRA markdown is simply [link]
             # Keep the text and update the link
             return text.replace(
-                    f'[{link.relative_link}]',
-                    f'[{link.text}|{link.absolute_link}]')
+                    f'[{link.original_link}]',
+                    f'[{link.text}|{link.wiki_link}]')
         else:  # Normal [text|link] link
             return text.replace(
-                    f'|{link.relative_link}]', f'|{link.absolute_link}]')
+                    f'|{link.original_link}]', f'|{link.wiki_link}]')
 
     elif link.link_type == RelativeLinkType.IMAGE:
-        if link.text == link.relative_link:
+        if link.text == link.original_link:
             # This means the JIRA markdown is simply !file.ext!
             # Keep the text and update the link
             return text.replace(
-                    f'!{link.relative_link}!', f'!{link.absolute_link}!')
+                    f'!{link.original_link}!', f'!{link.wiki_link}!')
         else:
             # Image with parameters, like !some_pic.png|alt=image!
             return text.replace(
-                    f'!{link.relative_link}|', f'!{link.absolute_link}|')
+                    f'!{link.original_link}|', f'!{link.wiki_link}|')
 
     else:
         logging.warning('Unexpected link type %s -returning text as is.',
