@@ -206,7 +206,7 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                 logging.info('No attachment found - attaching file %s',
                              link.target_path)
                 wiki_client.attach_file(
-                        filename=file_name, page_id=page_id)
+                        filename=link.target_path, page_id=page_id)
 
             link.wiki_link = file_name
 
