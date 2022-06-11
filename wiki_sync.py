@@ -245,10 +245,20 @@ def _extract_relative_links(file_path: str, file_contents: str,
         if rel_link.startswith('http'):
             continue
 
+        # TMP
+        logging.debug(file_path)
+        logging.debug(os.path.split(file_path)[0])
+        logging.debug(os.path.split(file_path)[0])
+        logging.debug(rel_link)
+
         target_path = os.path.join(os.path.split(file_path)[0], rel_link)
+        logging.debug(target_path)
         target_path = os.path.normpath(target_path)
+        logging.debug(target_path)
         if not os.path.exists(target_path):  # Not actually a relative link
+            logging.debug("%s doesn't exist")
             continue
+        logging.debug('%s exists')
 
         links.append(RelativeLink(link_type=link_type,
                                   text=text,
@@ -343,6 +353,7 @@ def create_or_update_pages_for_file(wiki_client: atlassian.Confluence,
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger('atlassian.rest_client').setLevel(logging.INFO)
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.INFO)
 
     try:
         files_to_sync = get_files_to_sync(os.environ['INPUT_MODIFIED-FILES'])
