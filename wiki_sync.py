@@ -193,18 +193,18 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
 
             # TODO This doesn't handle the case of a doc file including two
             # different images with the same file name
-            logging.info('Looking for an attachment named %s', file_name)
+            logging.debug('Looking for an attachment named %s', file_name)
             attachments = wiki_client.get_attachments_from_content(
                     page_id, filename=file_name)['results']
 
             if attachments:
-                logging.info('%s attachment(s) found', len(attachments))
+                logging.debug('%s attachment(s) found', len(attachments))
                 # TODO Figure out whether we want to update the image
                 # The API doesn't tell us when the file was last updated, so we
                 # can't compare that to the last commit on that file
             else:
-                logging.info('No attachment found - attaching file %s',
-                             link.target_path)
+                logging.info('Attaching file %s to page %s',
+                             link.target_path, page_id)
                 wiki_client.attach_file(
                         filename=link.target_path, page_id=page_id)
 
@@ -245,19 +245,10 @@ def _extract_relative_links(file_path: str, file_contents: str,
         if rel_link.startswith('http'):
             continue
 
-        # TMP
-        logging.debug(file_path)
-        logging.debug(os.path.split(file_path)[0])
-        logging.debug(rel_link)
-
         target_path = os.path.join(os.path.split(file_path)[0], rel_link)
-        logging.debug(target_path)
         target_path = os.path.normpath(target_path)
-        logging.debug(target_path)
         if not os.path.exists(target_path):  # Not actually a relative link
-            logging.debug("%s doesn't exist", target_path)
             continue
-        logging.debug('%s exists', target_path)
 
         links.append(RelativeLink(link_type=link_type,
                                   text=text,
@@ -350,7 +341,8 @@ def create_or_update_pages_for_file(wiki_client: atlassian.Confluence,
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
+    logging.getLogger('atlassian.confluence').setLevel(logging.INFO)
     logging.getLogger('atlassian.rest_client').setLevel(logging.INFO)
     logging.getLogger('urllib3.connectionpool').setLevel(logging.INFO)
 
