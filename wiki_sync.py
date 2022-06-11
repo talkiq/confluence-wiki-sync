@@ -19,10 +19,10 @@ import pypandoc
 # The format of a link in JIRA markdown is [link name|link]
 JIRA_LINK_PATTERN = re.compile(r'\[(.+)\|(.+)\]')
 # If the link doesn't have a name, then it's simply [link]
-JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[([^|]+)\]')
+JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[([^|\n]+)\]')
 # The format of an image in JIRA markdown is
 # !filename.png! or !some_pic.png|alt=image!
-JIRA_SIMPLE_IMG_PATTERN = re.compile(r'!([^|]+)!')
+JIRA_SIMPLE_IMG_PATTERN = re.compile(r'!([^|\n]+)!')
 JIRA_IMG_PATTERN_WITH_PARAMS = re.compile(r'!(.+)\|(.+)!')
 
 
@@ -248,7 +248,6 @@ def _extract_relative_links(file_path: str, file_contents: str,
         # TMP
         logging.debug(file_path)
         logging.debug(os.path.split(file_path)[0])
-        logging.debug(os.path.split(file_path)[0])
         logging.debug(rel_link)
 
         target_path = os.path.join(os.path.split(file_path)[0], rel_link)
@@ -256,9 +255,9 @@ def _extract_relative_links(file_path: str, file_contents: str,
         target_path = os.path.normpath(target_path)
         logging.debug(target_path)
         if not os.path.exists(target_path):  # Not actually a relative link
-            logging.debug("%s doesn't exist")
+            logging.debug("%s doesn't exist", target_path)
             continue
-        logging.debug('%s exists')
+        logging.debug('%s exists', target_path)
 
         links.append(RelativeLink(link_type=link_type,
                                   text=text,
