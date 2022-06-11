@@ -163,6 +163,10 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                     JIRA_SIMPLE_IMG_PATTERN, JIRA_IMG_PATTERN_WITH_PARAMS):
         links.extend(_extract_relative_links(file_path, contents, pattern))
 
+    if links:
+        logging.debug('Found %s relative links in %s: %s', len(links),
+                      file_path, links)
+
     for link in links:
         # First we decide what the wiki link will be
         if link.link_type == RelativeLinkType.GENERIC:
@@ -181,23 +185,26 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                 link.wiki_link = gh_root + link.target_path
 
         elif link.link_type == RelativeLinkType.IMAGE:
-            # Get the ID of the current page
             page_id = wiki_client.get_page_id(
                     os.environ['INPUT_SPACE-NAME'],
                     f'{repo_name}/{file_path}')
             _, file_name = os.path.split(link.target_path)
+            logging.debug('The ID of the current page is %s', page_id)
 
             # TODO This doesn't handle the case of a doc file including two
             # different images with the same file name
+            logging.info('Looking for an attachment named %s', file_name)
             attachments = wiki_client.get_attachments_from_content(
                     page_id, filename=file_name)['results']
 
             if attachments:
+                logging.info('%s attachment(s) found', len(attachments))
                 # TODO Figure out whether we want to update the image
                 # The API doesn't tell us when the file was last updated, so we
                 # can't compare that to the last commit on that file
-                pass
             else:
+                logging.info('No attachment found - attaching file %s',
+                             link.target_path)
                 wiki_client.attach_file(
                         filename=file_name, page_id=page_id)
 
@@ -334,7 +341,8 @@ def create_or_update_pages_for_file(wiki_client: atlassian.Confluence,
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger('atlassian.rest_client').setLevel(logging.INFO)
 
     try:
         files_to_sync = get_files_to_sync(os.environ['INPUT_MODIFIED-FILES'])
