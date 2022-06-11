@@ -73,7 +73,7 @@ def test_link_to_file_in_child_folder(wiki_mock, get_repo_root_mock):
     with tempfile.TemporaryDirectory() as repo_root:
         get_repo_root_mock.return_value = repo_root
 
-        # Create a file in a subfolder, that the doc will link to
+        # Create a file that the doc will link to (in a subfolder)
         os.makedirs(os.path.join(repo_root, 'foo', 'bar'))
         linked_file_name = 'foo/bar/linked_file.py'
         linked_doc_path = os.path.join(repo_root, linked_file_name)
@@ -193,11 +193,15 @@ def test_simple_link_to_image(wiki_mock, get_repo_root_mock):
     with tempfile.TemporaryDirectory() as repo_root:
         get_repo_root_mock.return_value = repo_root
 
-        # Create a file that the doc will link to
-        linked_file_name = 'cool_image.png'
+        # Create an image that the doc will link to (in a subfolder)
+        os.makedirs(os.path.join(repo_root, 'foo', 'bar'))
+        linked_file_name = 'foo/bar/cool_image.png'
         linked_doc_path = os.path.join(repo_root, linked_file_name)
         # The file isn't actually an image, but that's not important
         write_something_to_file(linked_doc_path)
+
+        # The wiki page doesn't have any attachments
+        wiki_mock.get_attachments_from_content.return_value = {'results': []}
 
         # Create the doc file with a link to the other one
         doc_path = os.path.join(repo_root, 'new_doc.md')
@@ -208,13 +212,37 @@ def test_simple_link_to_image(wiki_mock, get_repo_root_mock):
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, doc_path, GH_ROOT, REPO_NAME)
 
-        expected_output = ('Check out '
-                           f' !notthis!\n')
-        assert output == expected_output
+        # Even though the image isn't in the same folder as the document, the
+        # name of the image attached to the wiki page is just the file name
+        assert output == 'Check out !cool_image.png!\n'
+
+        wiki_mock.attach_file.assert_called_once()
 
 
 def test_link_to_image_with_params(wiki_mock, get_repo_root_mock):
-    del wiki_mock, get_repo_root_mock
+    with tempfile.TemporaryDirectory() as repo_root:
+        get_repo_root_mock.return_value = repo_root
+
+        # Create an image that the doc will link to
+        linked_file_name = 'cool_image.png'
+        linked_doc_path = os.path.join(repo_root, linked_file_name)
+        # The file isn't actually an image, but that's not important
+        write_something_to_file(linked_doc_path)
+
+        # The wiki page doesn't have any attachments
+        wiki_mock.get_attachments_from_content.return_value = {'results': []}
+
+        # Create the doc file with a link to the other one
+        doc_path = os.path.join(repo_root, 'new_doc.md')
+        with open(doc_path, mode='w', encoding='utf-8') as doc_file:
+            contents = f'Check out ![Cool image]({linked_file_name})'
+            print(contents, file=doc_file)
+
+        output = wiki_sync.get_formatted_file_content(
+                wiki_mock, doc_path, GH_ROOT, REPO_NAME)
+
+        assert output == f'Check out !{linked_file_name}|alt=Cool image!\n'
+        wiki_mock.attach_file.assert_called_once()
 
 
 def write_something_to_file(file_path: str) -> None:

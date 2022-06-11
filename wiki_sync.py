@@ -17,13 +17,13 @@ import pypandoc
 
 
 # The format of a link in JIRA markdown is [link name|link]
-JIRA_LINK_PATTERN = re.compile(r'\[(.*)\|(.*)\]')
+JIRA_LINK_PATTERN = re.compile(r'\[(.+)\|(.+)\]')
 # If the link doesn't have a name, then it's simply [link]
-JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[([^|]*)\]')
+JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[([^|]+)\]')
 # The format of an image in JIRA markdown is
 # !filename.png! or !some_pic.png|alt=image!
-JIRA_SIMPLE_IMG_PATTERN = re.compile(r'\!(.*)!')
-JIRA_IMG_PATTERN_WITH_PARAMS = re.compile(r'\!(.*)|(.*)!')
+JIRA_SIMPLE_IMG_PATTERN = re.compile(r'!([^|]+)!')
+JIRA_IMG_PATTERN_WITH_PARAMS = re.compile(r'!(.+)\|(.+)!')
 
 
 class RelativeLinkType(enum.Enum):
@@ -33,12 +33,15 @@ class RelativeLinkType(enum.Enum):
 
 @dataclasses.dataclass
 class RelativeLink:
-    """Represents a relative link and how to convert it to an absolute link"""
+    """Represents a relative link
+
+    Contains information to allow updating the link to something that works on
+    wiki"""
     link_type: RelativeLinkType
     text: str  # Text associated with the link (link name, alt text, ...)
-    original_link: str
+    original_link: str  # Link in the original document
     target_path: str  # Path of the file being linked to
-    wiki_link: str
+    wiki_link: str  # Link to be used in the wiki page
 
 
 def get_files_to_sync(changed_files: str) -> List[str]:
@@ -102,7 +105,7 @@ def sync_files(files: List[str]) -> bool:
         absolute_file_path = os.path.join(repo_root, file_path)
 
         if not os.path.exists(absolute_file_path):
-            # TODO delete corresponding wiki page
+            # TODO delete corresponding wiki page (#9)
             logging.warning(
                 'File %s not found. Deleting a wiki page is not currently'
                 ' supported, so you will have to delete it manually',
@@ -139,8 +142,10 @@ def get_formatted_file_content(wiki_client: atlassian.Confluence,
 
     Updates relative links to point to a Confluence page if it exists, or to a
     GitHub page.
-    """
 
+    If there is a relative link to an image, upload the image as an attachment
+    to the wiki page and update the link accordingly.
+    """
     formated_file_contents = pypandoc.convert_file(file_path, 'jira')
 
     formated_file_contents = _replace_relative_links(
@@ -154,20 +159,12 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                             ) -> str:
     links: List[RelativeLink] = []
 
-    links.extend(
-            _extract_relative_links(file_path, contents, JIRA_LINK_PATTERN))
-    links.extend(
-            _extract_relative_links(file_path, contents,
-                                    JIRA_UNNAMED_LINK_PATTERN))
-    links.extend(
-            _extract_relative_links(file_path, contents,
-                                    JIRA_SIMPLE_IMG_PATTERN))
-    links.extend(
-            _extract_relative_links(file_path, contents,
-                                    JIRA_IMG_PATTERN_WITH_PARAMS))
+    for pattern in (JIRA_LINK_PATTERN, JIRA_UNNAMED_LINK_PATTERN,
+                    JIRA_SIMPLE_IMG_PATTERN, JIRA_IMG_PATTERN_WITH_PARAMS):
+        links.extend(_extract_relative_links(file_path, contents, pattern))
 
     for link in links:
-        # Find absolute link
+        # First we decide what the wiki link will be
         if link.link_type == RelativeLinkType.GENERIC:
             wiki_page_info = wiki_client.get_page_by_title(
                     os.environ['INPUT_SPACE-NAME'],
@@ -184,15 +181,16 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                 link.wiki_link = gh_root + link.target_path
 
         elif link.link_type == RelativeLinkType.IMAGE:
+            # Get the ID of the current page
             page_id = wiki_client.get_page_id(
                     os.environ['INPUT_SPACE-NAME'],
                     f'{repo_name}/{file_path}')
             _, file_name = os.path.split(link.target_path)
 
             # TODO This doesn't handle the case of a doc file including two
-            # different images with the same name
+            # different images with the same file name
             attachments = wiki_client.get_attachments_from_content(
-                    page_id, filename=link.target_path)['results']
+                    page_id, filename=file_name)['results']
 
             if attachments:
                 # TODO Figure out whether we want to update the image
@@ -201,14 +199,14 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                 pass
             else:
                 wiki_client.attach_file(
-                        filename=link.target_path, page_id=page_id)
+                        filename=file_name, page_id=page_id)
 
             link.wiki_link = file_name
 
         else:
             raise Exception(f'Unexpected relative link type {link.link_type}')
 
-        # Replace relative links
+        # Then we replace the relative links
         contents = _replace_relative_link(contents, link)
 
     return contents
@@ -269,7 +267,6 @@ def _replace_relative_link(text: str, link: RelativeLink) -> str:
     elif link.link_type == RelativeLinkType.IMAGE:
         if link.text == link.original_link:
             # This means the JIRA markdown is simply !file.ext!
-            # Keep the text and update the link
             return text.replace(
                     f'!{link.original_link}!', f'!{link.wiki_link}!')
         else:
