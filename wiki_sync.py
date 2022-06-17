@@ -40,7 +40,7 @@ class RelativeLink:
     link_type: RelativeLinkType
     text: str  # Text associated with the link (link name, alt text, ...)
     original_link: str  # Link in the original document
-    target_path: str  # Path of the file being linked to
+    target_path: str  # Path of the file being linked to (from repository root)
     wiki_link: str  # Link to be used in the wiki page
 
 
@@ -192,7 +192,7 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
             logging.debug('The ID of the current page is %s', page_id)
 
             # TODO This doesn't handle the case of a doc file including two
-            # different images with the same file name
+            # different images with the same file name (#23)
             logging.debug('Looking for an attachment named %s', file_name)
             attachments = wiki_client.get_attachments_from_content(
                     page_id, filename=file_name)['results']
@@ -201,7 +201,7 @@ def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
                 logging.debug('%s attachment(s) found', len(attachments))
                 # TODO Figure out whether we want to update the image
                 # The API doesn't tell us when the file was last updated, so we
-                # can't compare that to the last commit on that file
+                # can't compare that to the last commit on that file (#24)
             else:
                 logging.info('Attaching file %s to page %s',
                              link.target_path, page_id)
@@ -224,35 +224,35 @@ def _extract_relative_links(file_path: str, file_contents: str,
     links: List[RelativeLink] = []
 
     for matching_groups in re.findall(pattern, file_contents):
-        text = rel_link = ''
+        text = target = ''
         link_type = RelativeLinkType.GENERIC
         if pattern == JIRA_LINK_PATTERN:
             text = matching_groups[0]
-            rel_link = matching_groups[1]
+            target = matching_groups[1]
         elif pattern == JIRA_UNNAMED_LINK_PATTERN:
-            text = rel_link = matching_groups
+            text = target = matching_groups
         elif pattern == JIRA_SIMPLE_IMG_PATTERN:
             link_type = RelativeLinkType.IMAGE
-            text = rel_link = matching_groups
+            text = target = matching_groups
         elif pattern == JIRA_IMG_PATTERN_WITH_PARAMS:
             link_type = RelativeLinkType.IMAGE
             text = matching_groups[1]
-            rel_link = matching_groups[0]
+            target = matching_groups[0]
         else:
             raise Exception(f'Unexpected link pattern {pattern}')
 
         # Most links are HTTP(S) - don't waste time with them
-        if rel_link.startswith('http'):
+        if target.startswith('http'):
             continue
 
-        target_path = os.path.join(os.path.split(file_path)[0], rel_link)
+        target_path = os.path.join(os.path.split(file_path)[0], target)
         target_path = os.path.normpath(target_path)
         if not os.path.exists(target_path):  # Not actually a relative link
             continue
 
         links.append(RelativeLink(link_type=link_type,
                                   text=text,
-                                  original_link=rel_link,
+                                  original_link=target,
                                   target_path=target_path,
                                   wiki_link=''))
 
