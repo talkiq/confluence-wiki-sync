@@ -1,7 +1,7 @@
-FROM python:3.10-alpine
+FROM python:3.9-bullseye
 
 # TODO Once the pandoc package makes it to stable, fetch it from there
-RUN apk update && apk add git && apk add pandoc --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing
+RUN apt-get update && apt-get install pandoc -y
 
 COPY requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
