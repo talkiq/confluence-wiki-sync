@@ -1,4 +1,4 @@
-FROM python:3.9-bullseye
+FROM python:3.10-bullseye
 
 # TODO Once the pandoc package makes it to stable, fetch it from there
 RUN apt-get update && apt-get install pandoc -y
