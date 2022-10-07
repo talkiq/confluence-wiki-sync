@@ -1,7 +1,6 @@
-FROM python:3.10-bullseye
+FROM python:3.10-slim-bullseye
 
-# TODO Once the pandoc package makes it to stable, fetch it from there
-RUN apt-get update && apt-get install pandoc -y
+RUN apt-get update && apt-get install git pandoc -y
 
 COPY requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
