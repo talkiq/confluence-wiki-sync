@@ -183,7 +183,10 @@ def test_link_to_non_existing_file(wiki_mock, get_repo_root_mock):
 
 
 def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
-    os.environ['INPUT_WIKI-BASE-URL'] = 'http://mywiki.atlassian.net'
+    space = 'WikiSpace'
+    os.environ['INPUT_SPACE-NAME'] = space
+    wiki_url = 'http://mywiki.atlassian.net'
+    os.environ['INPUT_WIKI-BASE-URL'] = wiki_url
 
     with tempfile.TemporaryDirectory() as repo_root:
         get_repo_root_mock.return_value = repo_root
@@ -197,7 +200,7 @@ def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
         # existing Confluence page, say yes
         wiki_mock.get_page_by_title.return_value = {
             '_links': {
-                'webui': '/spaces/SPACE/pages/123'
+                'webui': f'/spaces/{space}/pages/123'
                 }
             }
 
@@ -210,9 +213,12 @@ def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
         output = wiki_sync.get_formatted_file_content(
                 wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
 
-        wiki_link = 'http://mywiki.atlassian.net/wiki/spaces/SPACE/pages/123'
+        wiki_link = f'{wiki_url}/wiki/spaces/{space}/pages/123'
         expected_output = (f'Check out this [other file|{wiki_link}]\n')
         assert output == expected_output
+
+        wiki_mock.get_page_by_title.assert_called_once_with(
+                space, f'{REPO_NAME}/linked_file.py')
 
 
 def write_something_to_file(file_path: str) -> None:
