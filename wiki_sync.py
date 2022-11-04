@@ -136,8 +136,11 @@ def get_formatted_file_content(wiki_client: atlassian.Confluence,
         if not os.path.exists(target_path):  # Not actually a relative link
             continue
 
+        target_from_root = os.path.relpath(target_path, start=repo_root)
+
         wiki_page_info = wiki_client.get_page_by_title(
-                os.environ['INPUT_SPACE-NAME'], f'{repo_name}/{target_path}')
+                os.environ['INPUT_SPACE-NAME'],
+                f'{repo_name}/{target_from_root}')
         if wiki_page_info:
             # The link is to a file that has a Confluence page
             # Let's link to the page directly
@@ -146,7 +149,6 @@ def get_formatted_file_content(wiki_client: atlassian.Confluence,
             links_to_replace[link] = target_page_url
         else:
             # No existing Confluence page - link to GitHub
-            target_from_root = os.path.relpath(target_path, start=repo_root)
             links_to_replace[link] = gh_root + target_from_root
 
     # Replace relative links
