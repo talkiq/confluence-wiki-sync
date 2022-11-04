@@ -91,7 +91,7 @@ def sync_files(files: List[str]) -> bool:
 
         try:
             formatted_content = get_formatted_file_content(
-                    wiki_client, absolute_file_path, url_root_for_file,
+                    wiki_client, repo_root, file_path, url_root_for_file,
                     repo_name)
             content = read_only_warning + formatted_content
         except Exception:
@@ -111,8 +111,8 @@ def sync_files(files: List[str]) -> bool:
 
 
 def get_formatted_file_content(wiki_client: atlassian.Confluence,
-                               file_path: str, gh_root: str, repo_name: str
-                               ) -> str:
+                               repo_root: str, file_path: str, gh_root: str,
+                               repo_name: str) -> str:
     """
     Takes the absolute path of a file and returns its contents formatted as
     JIRA markdown.
@@ -123,14 +123,15 @@ def get_formatted_file_content(wiki_client: atlassian.Confluence,
     # keys are relative links; values are what they should be replaced with
     links_to_replace: Dict[str, str] = {}
 
-    formated_file_contents = pypandoc.convert_file(file_path, 'jira')
+    absolute_file_path = os.path.join(repo_root, file_path)
+    formated_file_contents = pypandoc.convert_file(absolute_file_path, 'jira')
 
     for link in re.findall(JIRA_LINK_PATTERN, formated_file_contents):
         # Most links are HTTP - don't waste time with them
         if link.startswith('http'):
             continue
 
-        target_path = os.path.join(os.path.split(file_path)[0], link)
+        target_path = os.path.join(os.path.split(absolute_file_path)[0], link)
         target_path = os.path.normpath(target_path)
         if not os.path.exists(target_path):  # Not actually a relative link
             continue
@@ -145,7 +146,8 @@ def get_formatted_file_content(wiki_client: atlassian.Confluence,
             links_to_replace[link] = target_page_url
         else:
             # No existing Confluence page - link to GitHub
-            links_to_replace[link] = gh_root + target_path
+            target_from_root = os.path.relpath(target_path, start=repo_root)
+            links_to_replace[link] = gh_root + target_from_root
 
     # Replace relative links
     for relative_link, new_link in links_to_replace.items():
