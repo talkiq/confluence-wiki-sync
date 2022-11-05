@@ -3,22 +3,45 @@
 This tool looks for modified doc files, transforms them into JIRA markdown and
 uploads them to Confluence
 """
+import dataclasses
+import enum
 import logging
 import os
 import re
 import subprocess
 import sys
-from typing import Dict, List
+from typing import List
 
 import atlassian
 import pypandoc
 
 
 # The format of a link in JIRA markdown is [link name|link]
-# We only need a capture group for the link itself
-# TODO handle links like [link], which happen when the link name is the same as
-# the link itself
-JIRA_LINK_PATTERN = re.compile(r'\[.*\|(.*)\]')
+JIRA_LINK_PATTERN = re.compile(r'\[(.+)\|(.+)\]')
+# If the link doesn't have a name, then it's simply [link]
+JIRA_UNNAMED_LINK_PATTERN = re.compile(r'\[([^|\n]+)\]')
+# The format of an image in JIRA markdown is
+# !filename.png! or !some_pic.png|alt=image!
+JIRA_SIMPLE_IMG_PATTERN = re.compile(r'!([^|\n]+)!')
+JIRA_IMG_PATTERN_WITH_PARAMS = re.compile(r'!(.+)\|(.+)!')
+
+
+class RelativeLinkType(enum.Enum):
+    GENERIC = 0  # [text|link] or [link]
+    IMAGE = 1  # !file.ext|alt=text! or !file.ext!
+
+
+@dataclasses.dataclass
+class RelativeLink:
+    """Represents a relative link
+
+    Contains information to allow updating the link to something that works on
+    wiki"""
+    link_type: RelativeLinkType
+    text: str  # Text associated with the link (link name, alt text, ...)
+    original_link: str  # Link in the original document
+    target_path: str  # Path of the file being linked to (from repository root)
+    wiki_link: str  # Link to be used in the wiki page
 
 
 def get_files_to_sync(changed_files: str) -> List[str]:
@@ -82,7 +105,7 @@ def sync_files(files: List[str]) -> bool:
         absolute_file_path = os.path.join(repo_root, file_path)
 
         if not os.path.exists(absolute_file_path):
-            # TODO delete corresponding wiki page
+            # TODO delete corresponding wiki page (#9)
             logging.warning(
                 'File %s not found. Deleting a wiki page is not currently'
                 ' supported, so you will have to delete it manually',
@@ -119,40 +142,149 @@ def get_formatted_file_content(wiki_client: atlassian.Confluence,
 
     Updates relative links to point to a Confluence page if it exists, or to a
     GitHub page.
-    """
-    # keys are relative links; values are what they should be replaced with
-    links_to_replace: Dict[str, str] = {}
 
+    If there is a relative link to an image, upload the image as an attachment
+    to the wiki page and update the link accordingly.
+    """
     formated_file_contents = pypandoc.convert_file(file_path, 'jira')
 
-    for link in re.findall(JIRA_LINK_PATTERN, formated_file_contents):
-        # Most links are HTTP - don't waste time with them
-        if link.startswith('http'):
+    formated_file_contents = _replace_relative_links(
+            wiki_client, file_path, formated_file_contents, gh_root, repo_name)
+
+    return formated_file_contents
+
+
+def _replace_relative_links(wiki_client: atlassian.Confluence, file_path: str,
+                            contents: str, gh_root: str, repo_name: str
+                            ) -> str:
+    links: List[RelativeLink] = []
+
+    for pattern in (JIRA_LINK_PATTERN, JIRA_UNNAMED_LINK_PATTERN,
+                    JIRA_SIMPLE_IMG_PATTERN, JIRA_IMG_PATTERN_WITH_PARAMS):
+        links.extend(_extract_relative_links(file_path, contents, pattern))
+
+    if links:
+        logging.debug('Found %s relative links in %s: %s', len(links),
+                      file_path, links)
+
+    for link in links:
+        # First we decide what the wiki link will be
+        if link.link_type == RelativeLinkType.GENERIC:
+            wiki_page_info = wiki_client.get_page_by_title(
+                    os.environ['INPUT_SPACE-NAME'],
+                    f'{repo_name}/{link.target_path}')
+            if wiki_page_info:
+                # The link is to a file that has a Confluence page
+                # Let's link to the page directly
+                target_page_url = (
+                        os.environ['INPUT_WIKI-BASE-URL']
+                        + '/wiki' + wiki_page_info['_links']['webui'])
+                link.wiki_link = target_page_url
+            else:
+                # No existing Confluence page - link to GitHub
+                link.wiki_link = gh_root + link.target_path
+
+        elif link.link_type == RelativeLinkType.IMAGE:
+            page_id = wiki_client.get_page_id(
+                    os.environ['INPUT_SPACE-NAME'],
+                    f'{repo_name}/{file_path}')
+            _, file_name = os.path.split(link.target_path)
+            logging.debug('The ID of the current page is %s', page_id)
+
+            # TODO This doesn't handle the case of a doc file including two
+            # different images with the same file name (#23)
+            logging.debug('Looking for an attachment named %s', file_name)
+            attachments = wiki_client.get_attachments_from_content(
+                    page_id, filename=file_name)['results']
+
+            if attachments:
+                logging.debug('%s attachment(s) found', len(attachments))
+                # TODO Figure out whether we want to update the image
+                # The API doesn't tell us when the file was last updated, so we
+                # can't compare that to the last commit on that file (#24)
+            else:
+                logging.info('Attaching file %s to page %s',
+                             link.target_path, page_id)
+                wiki_client.attach_file(
+                        filename=link.target_path, page_id=page_id)
+
+            link.wiki_link = file_name
+
+        else:
+            raise Exception(f'Unexpected relative link type {link.link_type}')
+
+        # Then we replace the relative links
+        contents = _replace_relative_link(contents, link)
+
+    return contents
+
+
+def _extract_relative_links(file_path: str, file_contents: str,
+                            pattern: re.Pattern) -> List[RelativeLink]:
+    links: List[RelativeLink] = []
+
+    for matching_groups in re.findall(pattern, file_contents):
+        text = target = ''
+        link_type = RelativeLinkType.GENERIC
+        if pattern == JIRA_LINK_PATTERN:
+            text = matching_groups[0]
+            target = matching_groups[1]
+        elif pattern == JIRA_UNNAMED_LINK_PATTERN:
+            text = target = matching_groups
+        elif pattern == JIRA_SIMPLE_IMG_PATTERN:
+            link_type = RelativeLinkType.IMAGE
+            text = target = matching_groups
+        elif pattern == JIRA_IMG_PATTERN_WITH_PARAMS:
+            link_type = RelativeLinkType.IMAGE
+            text = matching_groups[1]
+            target = matching_groups[0]
+        else:
+            raise Exception(f'Unexpected link pattern {pattern}')
+
+        # Most links are HTTP(S) - don't waste time with them
+        if target.startswith('http'):
             continue
 
-        target_path = os.path.join(os.path.split(file_path)[0], link)
+        target_path = os.path.join(os.path.split(file_path)[0], target)
         target_path = os.path.normpath(target_path)
         if not os.path.exists(target_path):  # Not actually a relative link
             continue
 
-        wiki_page_info = wiki_client.get_page_by_title(
-                os.environ['INPUT_SPACE-NAME'], f'{repo_name}/{target_path}')
-        if wiki_page_info:
-            # The link is to a file that has a Confluence page
-            # Let's link to the page directly
-            target_page_url = (os.environ['INPUT_WIKI-BASE-URL']
-                               + '/wiki' + wiki_page_info['_links']['webui'])
-            links_to_replace[link] = target_page_url
+        links.append(RelativeLink(link_type=link_type,
+                                  text=text,
+                                  original_link=target,
+                                  target_path=target_path,
+                                  wiki_link=''))
+
+    return links
+
+
+def _replace_relative_link(text: str, link: RelativeLink) -> str:
+    if link.link_type == RelativeLinkType.GENERIC:
+        if link.text == link.original_link:
+            # This means the JIRA markdown is simply [link]
+            # Keep the text and update the link
+            return text.replace(
+                    f'[{link.original_link}]',
+                    f'[{link.text}|{link.wiki_link}]')
+        else:  # Normal [text|link] link
+            return text.replace(
+                    f'|{link.original_link}]', f'|{link.wiki_link}]')
+
+    elif link.link_type == RelativeLinkType.IMAGE:
+        if link.text == link.original_link:
+            # This means the JIRA markdown is simply !file.ext!
+            return text.replace(
+                    f'!{link.original_link}!', f'!{link.wiki_link}!')
         else:
-            # No existing Confluence page - link to GitHub
-            links_to_replace[link] = gh_root + target_path
+            # Image with parameters, like !some_pic.png|alt=image!
+            return text.replace(
+                    f'!{link.original_link}|', f'!{link.wiki_link}|')
 
-    # Replace relative links
-    for relative_link, new_link in links_to_replace.items():
-        formated_file_contents = formated_file_contents.replace(
-                f'|{relative_link}]', f'|{new_link}]')
-
-    return formated_file_contents
+    else:
+        logging.warning('Unexpected link type %s -returning text as is.',
+                        link.link_type)
+        return text
 
 
 def get_repository_root() -> str:
@@ -210,6 +342,9 @@ def create_or_update_pages_for_file(wiki_client: atlassian.Confluence,
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    logging.getLogger('atlassian.confluence').setLevel(logging.INFO)
+    logging.getLogger('atlassian.rest_client').setLevel(logging.INFO)
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.INFO)
 
     try:
         files_to_sync = get_files_to_sync(os.environ['INPUT_MODIFIED-FILES'])
