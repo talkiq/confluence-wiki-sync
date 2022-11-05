@@ -18,7 +18,7 @@ import pypandoc
 # We only need a capture group for the link itself
 # TODO handle links like [link], which happen when the link name is the same as
 # the link itself
-JIRA_LINK_PATTERN = re.compile(r'\[.*\|(.*)\]')
+JIRA_LINK_PATTERN = re.compile(r'\[[^|\n]+\|([^|\n]+)\]')
 
 
 def get_files_to_sync(changed_files: str) -> List[str]:

@@ -221,6 +221,33 @@ def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
                 space, f'{REPO_NAME}/linked_file.py')
 
 
+def test_several_links_on_same_line(wiki_mock, get_repo_root_mock):
+    with tempfile.TemporaryDirectory() as repo_root:
+        get_repo_root_mock.return_value = repo_root
+
+        # Create file that the doc will link to
+        linked_file_name = 'linked_file.py'
+        write_something_to_file(os.path.join(repo_root, linked_file_name))
+        linked_file_name_2 = 'linked_file_2.go'
+        write_something_to_file(os.path.join(repo_root, linked_file_name_2))
+
+        # Create the doc file with a link to the other one
+        doc_path = os.path.join(repo_root, 'new_doc.md')
+        with open(doc_path, mode='w', encoding='utf-8') as doc_file:
+            contents = (f'Check out this [file]({linked_file_name})'
+                        f' and also [that one]({linked_file_name_2})')
+            print(contents, file=doc_file)
+
+        output = wiki_sync.get_formatted_file_content(
+                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+
+        expected_gh_links = [f'{GH_ROOT}{linked_file_name}',
+                             f'{GH_ROOT}{linked_file_name_2}']
+        expected_output = (f'Check out this [file|{expected_gh_links[0]}] and'
+                           f' also [that one|{expected_gh_links[1]}]\n')
+        assert output == expected_output
+
+
 def write_something_to_file(file_path: str) -> None:
     with open(file_path, mode='w', encoding='utf-8') as doc_file:
         print('Not important - file only needs to exist', file=doc_file)
