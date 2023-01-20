@@ -114,8 +114,8 @@ Our coding standards are pretty much just `PEP 8
 Install it with ``pip install pre-commit``, and install the pre-commit hooks
 with ``pre-commit install``.
 
-The same linters run in CI, and you can also run them with ``pre-commit run
---all-files``.
+The same linters run in CI, and you can also run them with
+``pre-commit run --all-files``.
 
 Automated tests
 ===============
