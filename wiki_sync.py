@@ -20,6 +20,7 @@ import pypandoc
 # TODO handle links like [link], which happen when the link name is the same as
 # the link itself
 JIRA_LINK_PATTERN = re.compile(r'\[[^|\n]+\|([^|\n]+)\]')
+JIRA_MACRO_PATTERN = re.compile(r'\${[a-zA-Z_-]*}')
 
 
 def get_files_to_sync(changed_files: str) -> List[str]:
@@ -135,6 +136,8 @@ def get_formatted_file_content(
     """
     # keys are relative links; values are what they should be replaced with
     links_to_replace: Dict[str, str] = {}
+    # keys are macros in XHTML; values are what they should be replaced with
+    macros_to_replace: Dict[str, str] = {}
 
     absolute_file_path = os.path.join(repo_root, file_path)
     formated_file_contents = pypandoc.convert_file(absolute_file_path, 'jira')
@@ -172,6 +175,16 @@ def get_formatted_file_content(
         formated_file_contents = formated_file_contents.replace(
             f'|{relative_link}]', f'|{new_link}]'
         )
+
+    # find macros and escape the curly braces
+    for macro in re.findall(JIRA_MACRO_PATTERN, formated_file_contents):
+        macros_to_replace[macro] = macro.replace('{','\{').replace('}','\}')
+
+    for macro, escaped_macro in macros_to_replace.items():
+        formated_file_contents = formated_file_contents.replace(
+                f'{macro}', f'{escaped_macro}')
+
+    logging.info(f'Fixed macros in: {formated_file_contents}')
 
     return formated_file_contents
 
