@@ -214,7 +214,7 @@ def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
                 wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
 
         wiki_link = f'{wiki_url}/wiki/spaces/{space}/pages/123'
-        expected_output = (f'Check out this [other file|{wiki_link}]\n')
+        expected_output = f'Check out this [other file|{wiki_link}]\n'
         assert output == expected_output
 
         wiki_mock.get_page_by_title.assert_called_once_with(
