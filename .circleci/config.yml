@@ -13,7 +13,7 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
     steps:
       - checkout
-      - run: apt-get update && apt-get install -y pip
+      - run: apt-get update && apt-get install -y python3-venv pip
       - run: |
           python3 -m venv venv
           source venv/bin/activate
