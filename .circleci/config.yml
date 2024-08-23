@@ -11,7 +11,8 @@ jobs:
       - checkout
       # Set DEBIAN_FRONTEND to avoid tzdata interactive input
       # https://techoverflow.net/2019/05/18/how-to-fix-configuring-tzdata-interactive-input-when-building-docker-images/
-      - run: DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y pip
+      - run: export DEBIAN_FRONTEND=noninteractive
+      - run: apt-get update && apt-get install -y pip
       - run: pip install -r requirements.txt
       - run: pip install pytest
       - run: pytest
