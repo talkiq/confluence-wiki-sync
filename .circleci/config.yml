@@ -7,11 +7,12 @@ jobs:
   run-tests:
     docker:
       - image: pandoc/core:latest-ubuntu
-    steps:
-      - checkout
+    environment:
       # Set DEBIAN_FRONTEND to avoid tzdata interactive input
       # https://techoverflow.net/2019/05/18/how-to-fix-configuring-tzdata-interactive-input-when-building-docker-images/
-      - run: export DEBIAN_FRONTEND=noninteractive
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - checkout
       - run: apt-get update && apt-get install -y pip
       - run: pip install -r requirements.txt
       - run: pip install pytest
