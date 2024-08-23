@@ -14,9 +14,13 @@ jobs:
     steps:
       - checkout
       - run: apt-get update && apt-get install -y pip
-      - run: pip install -r requirements.txt
-      - run: pip install pytest
-      - run: pytest
+      - run:
+        command: |
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+          pip install pytest
+          pytest
 
 workflows:
   run-jobs:
