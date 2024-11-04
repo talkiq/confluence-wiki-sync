@@ -12,18 +12,8 @@ repos:
     # Python
     -   id: check-ast
     -   id: debug-statements
--   repo: https://github.com/pylint-dev/pylint
-    rev: v3.0.2
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.2
     hooks:
-    -   id: pylint
-        args:
-        - --max-line-length=79
-        - -d broad-except
-        - -d fixme
-        - -d import-error
-        - -d invalid-name
-        - -d missing-docstring
--   repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
-    hooks:
-    -   id: flake8
+      - id: ruff # linter
+      - id: ruff-format # formatter

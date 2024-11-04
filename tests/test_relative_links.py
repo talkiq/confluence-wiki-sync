@@ -1,4 +1,5 @@
 """Tests that relative links are updated properly"""
+
 # Pylint seems to be confused by Pytest fixtures
 # pylint: disable=redefined-outer-name
 import os
@@ -41,7 +42,8 @@ def test_http_link(wiki_mock, get_repo_root_mock):
             print('Check out this [link](https://example.org)', file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
         assert output == 'Check out this [link|https://example.org]\n'
 
@@ -62,7 +64,8 @@ def test_link_to_file_both_in_root(wiki_mock, get_repo_root_mock):
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
         expected_gh_link = f'{GH_ROOT}{linked_file_name}'
         expected_output = f'Check out this [other file|{expected_gh_link}]\n'
@@ -86,7 +89,8 @@ def test_link_to_file_in_same_non_root_folder(wiki_mock, get_repo_root_mock):
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
         expected_gh_link = f'{GH_ROOT}foo/{linked_file_name}'
         expected_output = f'Check out this [other file|{expected_gh_link}]\n'
@@ -110,7 +114,8 @@ def test_link_to_file_in_child_folder(wiki_mock, get_repo_root_mock):
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
         expected_gh_link = f'{GH_ROOT}foo/bar/linked_file.py'
         expected_output = f'Check out this [other file|{expected_gh_link}]\n'
@@ -134,7 +139,8 @@ def test_link_to_file_in_parent_folder(wiki_mock, get_repo_root_mock):
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
         expected_gh_link = f'{GH_ROOT}linked_file.py'
         expected_output = f'Check out this [other file|{expected_gh_link}]\n'
@@ -159,7 +165,8 @@ def test_simplified_link(wiki_mock, get_repo_root_mock):
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
         expected_link = f'[{linked_file_name}|{GH_ROOT}linked_file.py'
         assert output == f'Check out {expected_link}\n'
@@ -176,7 +183,8 @@ def test_link_to_non_existing_file(wiki_mock, get_repo_root_mock):
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
         # Output is the same
         assert output == 'Check out this [other file|non_existing.py]\n'
@@ -199,10 +207,8 @@ def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
         # When the wiki client wants to know whether the linked file has an
         # existing Confluence page, say yes
         wiki_mock.get_page_by_title.return_value = {
-            '_links': {
-                'webui': f'/spaces/{space}/pages/123'
-                }
-            }
+            '_links': {'webui': f'/spaces/{space}/pages/123'}
+        }
 
         # Create the doc file with a link to the other one
         doc_path = os.path.join(repo_root, 'new_doc.md')
@@ -211,14 +217,16 @@ def test_link_to_file_that_exists_on_confluence(wiki_mock, get_repo_root_mock):
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
         wiki_link = f'{wiki_url}/wiki/spaces/{space}/pages/123'
         expected_output = f'Check out this [other file|{wiki_link}]\n'
         assert output == expected_output
 
         wiki_mock.get_page_by_title.assert_called_once_with(
-                space, f'{REPO_NAME}/linked_file.py')
+            space, f'{REPO_NAME}/linked_file.py'
+        )
 
 
 def test_several_links_on_same_line(wiki_mock, get_repo_root_mock):
@@ -234,17 +242,24 @@ def test_several_links_on_same_line(wiki_mock, get_repo_root_mock):
         # Create the doc file with a link to the other one
         doc_path = os.path.join(repo_root, 'new_doc.md')
         with open(doc_path, mode='w', encoding='utf-8') as doc_file:
-            contents = (f'Check out this [file]({linked_file_name})'
-                        f' and also [that one]({linked_file_name_2})')
+            contents = (
+                f'Check out this [file]({linked_file_name})'
+                f' and also [that one]({linked_file_name_2})'
+            )
             print(contents, file=doc_file)
 
         output = wiki_sync.get_formatted_file_content(
-                wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME)
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
 
-        expected_gh_links = [f'{GH_ROOT}{linked_file_name}',
-                             f'{GH_ROOT}{linked_file_name_2}']
-        expected_output = (f'Check out this [file|{expected_gh_links[0]}] and'
-                           f' also [that one|{expected_gh_links[1]}]\n')
+        expected_gh_links = [
+            f'{GH_ROOT}{linked_file_name}',
+            f'{GH_ROOT}{linked_file_name_2}',
+        ]
+        expected_output = (
+            f'Check out this [file|{expected_gh_links[0]}] and'
+            f' also [that one|{expected_gh_links[1]}]\n'
+        )
         assert output == expected_output
 
 

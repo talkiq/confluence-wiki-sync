@@ -2,6 +2,7 @@
 End-to-end tests that make sure the correct Confluence pages are
 created/updated, and with the correct content
 """
+
 import tempfile
 import os
 from unittest import mock
@@ -38,8 +39,7 @@ def test_page_is_created_under_correct_root(mock_wiki, get_repo_root_mock):
 
         wiki_sync.sync_files([file_name])
 
-        wiki_client.get_page_id.assert_called_once_with(
-                space_name, root_page_title)
+        wiki_client.get_page_id.assert_called_once_with(space_name, root_page_title)
 
         call_args_list = wiki_client.update_or_create.call_args_list
         assert len(call_args_list) == 1
