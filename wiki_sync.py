@@ -178,13 +178,12 @@ def get_formatted_file_content(
 
     # find macros and escape the curly braces
     for macro in re.findall(JIRA_MACRO_PATTERN, formated_file_contents):
-        macros_to_replace[macro] = macro.replace('{','\{').replace('}','\}')
+        macros_to_replace[macro] = macro.replace('{', r'\{').replace('}', r'\}')
 
     for macro, escaped_macro in macros_to_replace.items():
         formated_file_contents = formated_file_contents.replace(
-                f'{macro}', f'{escaped_macro}')
-
-    logging.info(f'Fixed macros in: {formated_file_contents}')
+            f'{macro}', f'{escaped_macro}'
+        )
 
     return formated_file_contents
 
