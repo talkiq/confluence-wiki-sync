@@ -107,9 +107,9 @@ Development
 Coding standards
 ================
 
-Our coding standards are pretty much just `PEP 8
-<https://www.python.org/dev/peps/pep-0008/>`_, and are managed using
-`pre-commit <https://pre-commit.com>`_.
+Our coding standards are pretty much "whatever `ruff
+<https://docs.astral.sh/ruff/>`_ says", and are managed using `pre-commit
+<https://pre-commit.com>`_.
 
 Install it with ``pip install pre-commit``, and install the pre-commit hooks
 with ``pre-commit install``.

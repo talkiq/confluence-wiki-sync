@@ -1,4 +1,5 @@
 """Tests that the correct files are considered for sync"""
+
 import os
 
 import wiki_sync
