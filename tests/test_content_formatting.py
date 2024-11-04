@@ -1,7 +1,7 @@
-"""Tests that relative links are updated properly"""
+"""Tests that file content is updated properly
 
-# Pylint seems to be confused by Pytest fixtures
-# pylint: disable=redefined-outer-name
+e.g. relative links, escaping special JIRA strings"""
+
 import os
 import tempfile
 from unittest import mock
@@ -15,7 +15,7 @@ GH_ROOT = 'https://root/github/path/'
 REPO_NAME = 'GenericRepo'
 
 
-def setup():
+def setup_function():
     os.environ['INPUT_SPACE-NAME'] = 'MySpace'
     os.environ['INPUT_WIKI-BASE-URL'] = 'http://mywiki.atlassian.net'
 
@@ -261,6 +261,22 @@ def test_several_links_on_same_line(wiki_mock, get_repo_root_mock):
             f' also [that one|{expected_gh_links[1]}]\n'
         )
         assert output == expected_output
+
+
+def test_jira_macro():
+    with tempfile.TemporaryDirectory() as repo_root:
+        get_repo_root_mock.return_value = repo_root
+
+        # Create the doc file with an HTTP link
+        doc_path = os.path.join(repo_root, 'new_doc.md')
+        with open(doc_path, mode='w', encoding='utf-8') as doc_file:
+            print('Bash example using ${SOME_VARIABLE}', file=doc_file)
+
+        output = wiki_sync.get_formatted_file_content(
+            wiki_mock, repo_root, doc_path, GH_ROOT, REPO_NAME
+        )
+
+        assert output == r'Bash example using $\{SOME_VARIABLE\}' + '\n'
 
 
 def write_something_to_file(file_path: str) -> None:
