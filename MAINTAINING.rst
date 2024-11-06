@@ -14,8 +14,8 @@ version (whatever that means to the maintainer).
 
 When you've decided that this has happened, pick a version number. We use
 `Semantic Versioning <https://semver.org/>`_. For the purpose of this script,
-an incompatible API change is either removing an entry from ``action.yml``, or
-adding a required one.
+an incompatible API change is either removing an entry from ``action.yml``,
+adding a required one, or changing the default value of an optional one.
 
 Make sure all the tests pass on main.
 
