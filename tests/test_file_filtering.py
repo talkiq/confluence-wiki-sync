@@ -8,7 +8,7 @@ import wiki_sync
 def test_no_ignored_folder():
     os.environ['INPUT_IGNORED-FOLDERS'] = ''
 
-    # MD and RST files should be synched
+    # MD and RST files should be synced
     assert wiki_sync.should_sync_file('file.md')
     assert wiki_sync.should_sync_file('file.rst')
 

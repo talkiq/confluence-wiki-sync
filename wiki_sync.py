@@ -6,7 +6,6 @@ uploads them to Confluence
 
 import logging
 import os
-import subprocess
 import sys
 
 import atlassian
@@ -45,6 +44,11 @@ def should_sync_file(file_name: str) -> bool:
 
 
 def sync_files(files: list[str]) -> bool:
+    """
+    param files: List of file paths relative to the repository root
+
+    The script runs at the root of the repo as well, so the paths are also relative to
+    the current script."""
     had_errors = False
 
     wiki_client = atlassian.Confluence(
@@ -66,10 +70,8 @@ def sync_files(files: list[str]) -> bool:
     url_root_for_file = f'https://github.com/{github_repo}/blob/HEAD/'
     repo_name = github_repo.split('/')[1]
 
-    repo_root = get_repository_root()
-
     converter = content_converter.ContentConverter(
-        wiki_client, repo_root, url_root_for_file, repo_name
+        wiki_client, url_root_for_file, repo_name
     )
 
     for file_path in files:
@@ -82,14 +84,13 @@ def sync_files(files: list[str]) -> bool:
             'Your modifications would be lost the next time the source file'
             ' is updated.{warning}\n'
         )
-        absolute_file_path = os.path.join(repo_root, file_path)
 
-        if not os.path.exists(absolute_file_path):
+        if not os.path.exists(file_path):
             # TODO delete corresponding wiki page (#9)
             logging.warning(
                 'File %s not found. Deleting a wiki page is not currently'
                 ' supported, so you will have to delete it manually',
-                absolute_file_path,
+                file_path,
             )
             continue
 
@@ -97,7 +98,7 @@ def sync_files(files: list[str]) -> bool:
             formatted_content = converter.convert_file_contents(file_path)
             content = read_only_warning + formatted_content
         except Exception:
-            logging.exception('Error converting file %s:', absolute_file_path)
+            logging.exception('Error converting file %s:', file_path)
             had_errors = True
             continue
 
@@ -106,7 +107,7 @@ def sync_files(files: list[str]) -> bool:
                 wiki_client, root_page_id, repo_name, file_path, content
             )
         except Exception:
-            logging.exception('Error uploading file %s:', absolute_file_path)
+            logging.exception('Error uploading file %s:', file_path)
             had_errors = True
             continue
 
@@ -119,21 +120,12 @@ def sync_files(files: list[str]) -> bool:
                 wiki_client.attach_file(filename=attachment_path, page_id=page_id)
             except Exception:
                 logging.exception(
-                    'Error attaching %s to %s:', attachment_path, absolute_file_path
+                    'Error attaching %s to %s:', attachment_path, file_path
                 )
                 had_errors = True
                 continue
 
     return had_errors
-
-
-def get_repository_root() -> str:
-    repo_root = ''
-    with subprocess.Popen(
-        ['git', 'rev-parse', '--show-toplevel'], stdout=subprocess.PIPE
-    ) as proc:
-        repo_root = proc.communicate()[0].rstrip().decode('utf-8')
-    return repo_root
 
 
 def create_or_update_pages_for_file(

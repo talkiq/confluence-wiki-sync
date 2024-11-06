@@ -48,12 +48,10 @@ class ContentConverter:
     def __init__(
         self,
         wiki_client: atlassian.Confluence,
-        repo_root: str,
         gh_root: str,
         repo_name: str,
     ) -> str:
         self.wiki_client = wiki_client
-        self.repo_root = repo_root
         self.gh_root = gh_root
         self.repo_name = repo_name
 
@@ -62,8 +60,7 @@ class ContentConverter:
     def convert_file_contents(self, file_path: str) -> str:
         self.files_to_attach_to_last_page = []
 
-        absolute_file_path = os.path.join(self.repo_root, file_path)
-        formated_file_contents = pypandoc.convert_file(absolute_file_path, 'jira')
+        formated_file_contents = pypandoc.convert_file(file_path, 'jira')
 
         return self._replace_relative_links(file_path, formated_file_contents)
 
@@ -159,14 +156,10 @@ class ContentConverter:
                 continue
 
             # Find the absolute path of the target file
-            file_abs_path = os.path.join(self.repo_root, file_path)
-            file_abs_dir = os.path.dirname(file_abs_path)
-            target_abs_path = os.path.normpath(os.path.join(file_abs_dir, target))
-            if not os.path.exists(target_abs_path):  # Not actually a relative link
+            file_dir = os.path.dirname(file_path)
+            target_path = os.path.normpath(os.path.join(file_dir, target))
+            if not os.path.exists(target_path):  # Not actually a relative link
                 continue
-
-            # Now find the path from repo root to the target file
-            target_path = target_abs_path.removeprefix(self.repo_root).removeprefix('/')
 
             links.append(
                 RelativeLink(
