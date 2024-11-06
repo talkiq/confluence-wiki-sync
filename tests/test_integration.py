@@ -141,6 +141,17 @@ def test_new_image_attachment_to_existing_page(use_temp_dir, wiki_mock):
     )
 
 
+def test_root_does_not_exist(wiki_mock):
+    """#11"""
+    set_up_dummy_environment('SPACE', 'My docs')
+    wiki_mock.get_page_id.return_value = None
+
+    success = wiki_sync.sync_files(['foo.md'])
+
+    assert not success
+    wiki_mock.update_or_create.assert_not_called()
+
+
 def set_up_dummy_environment(space_name: str, root_page_title: str) -> None:
     os.environ['GITHUB_REPOSITORY'] = 'owner/repo'
     os.environ['INPUT_DEFAULT-GIT-BRANCH'] = 'main'

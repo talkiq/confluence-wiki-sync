@@ -46,21 +46,18 @@ def should_sync_file(file_name: str) -> bool:
 def sync_files(files: list[str]) -> bool:
     """
     param files: List of file paths relative to the repository root
+    returns: True if the sync was successful
 
     The script runs at the root of the repo as well, so the paths are also relative to
     the current script."""
-    had_errors = False
+    success = True
 
-    wiki_client = atlassian.Confluence(
-        os.environ['INPUT_WIKI-BASE-URL'],
-        username=os.environ['INPUT_USER'],
-        password=os.environ['INPUT_TOKEN'],
-        cloud=True,
-    )
+    wiki_client = _create_wiki_client()
 
-    root_page_id = wiki_client.get_page_id(
-        os.environ['INPUT_SPACE-NAME'], os.environ['INPUT_ROOT-PAGE-TITLE']
-    )
+    root_page_id = _get_root_page_id(wiki_client)
+    if not root_page_id:
+        return False
+
     logging.debug('The base root ID is %s', root_page_id)
 
     github_repo = os.environ['GITHUB_REPOSITORY']  # eg. 'octocat/Hello-World'
@@ -85,7 +82,7 @@ def sync_files(files: list[str]) -> bool:
         )
 
         if not os.path.exists(file_path):
-            # TODO delete corresponding wiki page (#9)
+            # See #9
             logging.warning(
                 'File %s not found. Deleting a wiki page is not currently'
                 ' supported, so you will have to delete it manually',
@@ -98,7 +95,7 @@ def sync_files(files: list[str]) -> bool:
             content = read_only_warning + formatted_content
         except Exception:
             logging.exception('Error converting file %s:', file_path)
-            had_errors = True
+            success = False
             continue
 
         try:
@@ -107,7 +104,7 @@ def sync_files(files: list[str]) -> bool:
             )
         except Exception:
             logging.exception('Error uploading file %s:', file_path)
-            had_errors = True
+            success = False
             continue
 
         # Image attachments are decided when parsing the JIRA markdown contents of the
@@ -121,10 +118,31 @@ def sync_files(files: list[str]) -> bool:
                 logging.exception(
                     'Error attaching %s to %s:', attachment_path, file_path
                 )
-                had_errors = True
+                success = False
                 continue
 
-    return had_errors
+    return success
+
+
+def _create_wiki_client() -> None:
+    return atlassian.Confluence(
+        os.environ['INPUT_WIKI-BASE-URL'],
+        username=os.environ['INPUT_USER'],
+        password=os.environ['INPUT_TOKEN'],
+        cloud=True,
+    )
+
+
+def _get_root_page_id(wiki_client) -> None:
+    space_name = os.environ['INPUT_SPACE-NAME']
+    root_page_title = os.environ['INPUT_ROOT-PAGE-TITLE']
+    root_page_id = wiki_client.get_page_id(space_name, root_page_title)
+
+    if not root_page_id:
+        logging.error(
+            'Could not find root page %s in space %s', root_page_title, space_name
+        )
+    return root_page_id
 
 
 def create_or_update_pages_for_file(
@@ -186,9 +204,9 @@ if __name__ == '__main__':
         files_to_sync = get_files_to_sync(os.environ['INPUT_MODIFIED-FILES'])
         logging.info('Files to be synced: %s', files_to_sync)
 
-        had_sync_errors = sync_files(files_to_sync)
+        sync_success = sync_files(files_to_sync)
 
-        sys.exit(1 if had_sync_errors else 0)
+        sys.exit(0 if sync_success else 1)
     except Exception:
         logging.exception('Unhandled exception')
         sys.exit(1)
