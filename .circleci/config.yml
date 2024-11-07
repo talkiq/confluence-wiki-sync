@@ -6,17 +6,12 @@ orbs:
 jobs:
   run-tests:
     docker:
-      - image: pandoc/core:latest-ubuntu
-    environment:
-      # Set DEBIAN_FRONTEND to avoid tzdata interactive input
-      # https://techoverflow.net/2019/05/18/how-to-fix-configuring-tzdata-interactive-input-when-building-docker-images/
-      DEBIAN_FRONTEND: noninteractive
+      # Use the same image as the base of the Dockerfile
+      - image: python:3.13-slim
     steps:
       - checkout
-      - run: apt-get update && apt-get install -y python3-venv pip
+      - run: apt-get update && apt-get install -y git pandoc
       - run: |
-          python3 -m venv venv
-          source venv/bin/activate
           pip install -r requirements.txt
           pip install pytest
           pytest
