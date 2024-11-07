@@ -10,7 +10,7 @@ jobs:
       - image: python:3.13-slim
     steps:
       - checkout
-      - run: apt-get update && apt-get install -y git pandoc
+      - run: apt-get update && apt-get install -y pandoc
       - run: |
           pip install -r requirements.txt
           pip install pytest
