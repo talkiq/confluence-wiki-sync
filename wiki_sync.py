@@ -64,11 +64,10 @@ def sync_files(files: list[str]) -> bool:
     logging.debug('The base root ID is %s', root_page_id)
 
     github_repo = os.environ['GITHUB_REPOSITORY']  # eg. 'octocat/Hello-World'
-    # TODO consider getting the name of the default branch and using that
-    # instead of HEAD
-    # Could be an optional parameter in action.yml
-    url_root_for_file = f'https://github.com/{github_repo}/blob/HEAD/'
     repo_name = github_repo.split('/')[1]
+
+    default_git_branch = os.environ['INPUT_DEFAULT-GIT-BRANCH']
+    url_root_for_file = f'https://github.com/{github_repo}/blob/{default_git_branch}/'
 
     converter = content_converter.ContentConverter(
         wiki_client, url_root_for_file, repo_name

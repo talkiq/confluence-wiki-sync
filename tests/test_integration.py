@@ -143,6 +143,7 @@ def test_new_image_attachment_to_existing_page(use_temp_dir, wiki_mock):
 
 def set_up_dummy_environment(space_name: str, root_page_title: str) -> None:
     os.environ['GITHUB_REPOSITORY'] = 'owner/repo'
+    os.environ['INPUT_DEFAULT-GIT-BRANCH'] = 'main'
     os.environ['INPUT_ROOT-PAGE-TITLE'] = root_page_title
     os.environ['INPUT_SPACE-NAME'] = space_name
     os.environ['INPUT_TOKEN'] = ''
