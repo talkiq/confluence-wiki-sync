@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from content_converter import ContentConverter
+from src.content_converter import ContentConverter
 
 
 GH_ROOT = 'https://root/github/path/'

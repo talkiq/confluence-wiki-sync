@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install pandoc -y
 COPY requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
 
-COPY *.py /
+COPY /src/*.py /
 
 ENTRYPOINT ["python3"]
 CMD ["/wiki_sync.py"]
