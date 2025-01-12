@@ -9,4 +9,4 @@ RUN pip install -r /requirements.txt
 COPY /src/*.py /
 
 ENTRYPOINT ["python3"]
-CMD ["/wiki_sync.py"]
+CMD ["/src/wiki_sync.py"]
