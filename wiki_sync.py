@@ -14,7 +14,7 @@ import content_converter
 
 
 def get_files_to_sync(changed_files: str) -> list[str]:
-    return [f for f in changed_files.split(' | ') if should_sync_file(f)]
+    return [f for f in changed_files.split('|') if should_sync_file(f)]
 
 
 def should_sync_file(file_name: str) -> bool:

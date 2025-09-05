@@ -42,7 +42,7 @@ two commits and get a list of modified files.
             fetch-depth: 2
 
         - name: Get modified files
-          run: echo "MODIFIED_FILES=$(git diff HEAD^ --name-only | tr '\n' ' | ')" >> $GITHUB_ENV
+          run: echo "MODIFIED_FILES=$(git diff HEAD^ --name-only | tr '\n' '|')" >> $GITHUB_ENV
 
         - name: Wiki Sync
           uses: talkiq/confluence-wiki-sync@v1
@@ -56,7 +56,7 @@ two commits and get a list of modified files.
 
 It is recommended to save the Confluence token as a GitHub secret.
 
-We join the modified files on `" | "` so that we can pass them to the action
+We join the modified files on `"|"` so that we can pass them to the action
 as a single string, which is then split with the same separator in the action.
 This allows support for files and paths with spaces.
 
