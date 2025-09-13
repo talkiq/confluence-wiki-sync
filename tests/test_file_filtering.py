@@ -2,7 +2,7 @@
 
 import os
 
-import wiki_sync
+from src import wiki_sync
 
 
 def test_no_ignored_folder():

@@ -8,7 +8,7 @@ from unittest import mock
 
 import pytest
 
-import wiki_sync
+from src import wiki_sync
 
 
 @pytest.fixture
