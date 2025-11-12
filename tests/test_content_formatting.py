@@ -309,6 +309,34 @@ def test_jira_macro(use_temp_dir):
     assert output == r'Bash example using $\{SOME_VARIABLE\}' + '\n'
 
 
+def test_rst_note(use_temp_dir):
+    """This documents the behaviour that will get fixed in #76"""
+    doc_path = 'new_doc.rst'
+    contents = """This is some text
+
+.. note::
+
+   This is a note
+
+And some more text"""
+    with open(doc_path, mode='w', encoding='utf-8') as doc_file:
+        print(contents, file=doc_file)
+
+    converter = ContentConverter(wiki_mock, GH_ROOT, REPO_NAME)
+    output = converter.convert_file_contents(doc_path)
+
+    expected_output = """This is some text
+
+Note
+
+This is a note
+
+And some more text
+"""
+
+    assert output == expected_output
+
+
 def write_something_to_file(file_path: str) -> None:
     with open(file_path, mode='w', encoding='utf-8') as doc_file:
         print('Not important - file only needs to exist', file=doc_file)
