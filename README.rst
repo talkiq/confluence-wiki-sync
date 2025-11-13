@@ -28,10 +28,6 @@ two commits and get a list of modified files.
 .. code-block:: yaml
 
   # .github/workflows/my-workflow.yml
-  on:
-    push:
-      branches: [master]
-
   jobs:
     wiki-sync:
       runs-on: ubuntu-latest
@@ -55,10 +51,6 @@ two commits and get a list of modified files.
             root-page-title: Root page
 
 It is recommended to save the Confluence token as a GitHub secret.
-
-We join the modified files on `"|"` so that we can pass them to the action
-as a single string, which is then split with the same separator in the action.
-This allows support for files and paths with spaces.
 
 -------------
 Configuration
