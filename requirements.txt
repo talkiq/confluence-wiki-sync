@@ -1,2 +1,2 @@
 atlassian-python-api==4.0.7
-pypandoc==1.16
+pypandoc==1.16.2
