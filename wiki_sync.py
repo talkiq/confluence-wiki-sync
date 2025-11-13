@@ -18,8 +18,9 @@ def get_files_to_sync(changed_files: str) -> list[str]:
 
 
 def should_sync_file(file_name: str) -> bool:
+    _, file_ext = os.path.splitext(file_name)
     # TODO Consider getting a list of extensions from action.yml
-    if not (file_name.endswith('.md') or file_name.endswith('.rst')):
+    if file_ext not in {'.md', '.rst'}:
         return False
 
     ignored_folders = os.environ['INPUT_IGNORED-FOLDERS'].split(' ')

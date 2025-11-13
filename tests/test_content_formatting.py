@@ -14,18 +14,25 @@ GH_ROOT = 'https://root/github/path/'
 REPO_NAME = 'GenericRepo'
 
 
+def setup_module():
+    # The tests run in temp folders, so they will look for PANDOC_FILTERS_FOLDER there
+    # Set the correct value now, before individual tests chdir into their temp folders
+    mock.patch(
+        'constants.PANDOC_FILTERS_FOLDER', os.path.join(os.getcwd(), 'pandoc_filters')
+    ).start()
+
+
 def setup_function():
     os.environ['INPUT_SPACE-NAME'] = 'MySpace'
     os.environ['INPUT_WIKI-BASE-URL'] = 'http://mywiki.atlassian.net'
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def use_temp_dir(tmp_path):
     # tmp_path is the path to a pytest-provided temporary folder
     # Run the test inside it, so the files it creates are cleaned up afterwards
     os.chdir(tmp_path)
     os.makedirs('foo/bar')
-    yield
 
 
 @pytest.fixture
@@ -35,7 +42,7 @@ def wiki_mock():
     return m
 
 
-def test_http_link(use_temp_dir, wiki_mock):
+def test_http_link(wiki_mock):
     # Create the doc file with an HTTP link
     doc_path = 'new_doc.md'
     with open(doc_path, mode='w', encoding='utf-8') as doc_file:
@@ -47,7 +54,7 @@ def test_http_link(use_temp_dir, wiki_mock):
     assert output == 'Check out this [link|https://example.org]\n'
 
 
-def test_link_to_file_both_in_root(use_temp_dir, wiki_mock):
+def test_link_to_file_both_in_root(wiki_mock):
     # Create a file that the doc will link to
     linked_file_path = 'linked_file.py'
     write_something_to_file(linked_file_path)
@@ -66,7 +73,7 @@ def test_link_to_file_both_in_root(use_temp_dir, wiki_mock):
     assert output == expected_output
 
 
-def test_link_to_file_in_same_non_root_folder(use_temp_dir, wiki_mock):
+def test_link_to_file_in_same_non_root_folder(wiki_mock):
     # Create a file that the doc will link to
     linked_file_name = 'linked_file.py'
     linked_file_path = os.path.join('foo', 'linked_file.py')
@@ -86,7 +93,7 @@ def test_link_to_file_in_same_non_root_folder(use_temp_dir, wiki_mock):
     assert output == expected_output
 
 
-def test_link_to_file_in_child_folder(use_temp_dir, wiki_mock):
+def test_link_to_file_in_child_folder(wiki_mock):
     # Create a file that the doc will link to (in a subfolder)
     linked_doc_path = os.path.join('foo', 'bar', 'linked_file.py')
     write_something_to_file(linked_doc_path)
@@ -105,7 +112,7 @@ def test_link_to_file_in_child_folder(use_temp_dir, wiki_mock):
     assert output == expected_output
 
 
-def test_link_to_file_in_parent_folder(use_temp_dir, wiki_mock):
+def test_link_to_file_in_parent_folder(wiki_mock):
     # Create a file that the doc will link to
     linked_doc_path = 'linked_file.py'
     write_something_to_file(linked_doc_path)
@@ -124,7 +131,7 @@ def test_link_to_file_in_parent_folder(use_temp_dir, wiki_mock):
     assert output == expected_output
 
 
-def test_simplified_link(use_temp_dir, wiki_mock):
+def test_simplified_link(wiki_mock):
     """Link where the name of the link is the same as the link itself"""
     # Create a file that the doc will link to
     linked_doc_path = 'linked_file.py'
@@ -143,7 +150,7 @@ def test_simplified_link(use_temp_dir, wiki_mock):
     assert output == f'Check out {expected_link}\n'
 
 
-def test_link_to_non_existing_file(use_temp_dir, wiki_mock):
+def test_link_to_non_existing_file(wiki_mock):
     # Create the doc file with a link to a non-existing file
     doc_path = 'new_doc.md'
     with open(doc_path, mode='w', encoding='utf-8') as doc_file:
@@ -157,7 +164,7 @@ def test_link_to_non_existing_file(use_temp_dir, wiki_mock):
     assert output == 'Check out this [other file|non_existing.py]\n'
 
 
-def test_link_to_file_that_exists_on_confluence(use_temp_dir, wiki_mock):
+def test_link_to_file_that_exists_on_confluence(wiki_mock):
     space = 'WikiSpace'
     os.environ['INPUT_SPACE-NAME'] = space
     wiki_url = 'http://mywiki.atlassian.net'
@@ -191,7 +198,7 @@ def test_link_to_file_that_exists_on_confluence(use_temp_dir, wiki_mock):
     )
 
 
-def test_several_links_on_same_line(use_temp_dir, wiki_mock):
+def test_several_links_on_same_line(wiki_mock):
     # Create file that the doc will link to
     linked_file_name = 'linked_file.py'
     write_something_to_file(linked_file_name)
@@ -221,7 +228,7 @@ def test_several_links_on_same_line(use_temp_dir, wiki_mock):
     assert output == expected_output
 
 
-def test_simple_link_to_image(use_temp_dir, wiki_mock):
+def test_simple_link_to_image(wiki_mock):
     # Create an image that the doc will link to (in a subfolder)
     linked_doc_path = os.path.join('foo', 'bar', 'cool_image.png')
     # The file isn't actually an image, but that's not important
@@ -246,7 +253,7 @@ def test_simple_link_to_image(use_temp_dir, wiki_mock):
     wiki_mock.attach_file.assert_called_once()
 
 
-def test_simple_link_to_image_new_page(use_temp_dir, wiki_mock):
+def test_simple_link_to_image_new_page(wiki_mock):
     """Same as the previous one, but the wiki page didn't already exist"""
     # Create an image that the doc will link to (in a subfolder)
     linked_doc_path = os.path.join('foo', 'bar', 'cool_image.png')
@@ -276,7 +283,7 @@ def test_simple_link_to_image_new_page(use_temp_dir, wiki_mock):
     assert converter.files_to_attach_to_last_page == [linked_doc_path]
 
 
-def test_link_to_image_with_params(use_temp_dir, wiki_mock):
+def test_link_to_image_with_params(wiki_mock):
     # Create an image that the doc will link to
     linked_doc_path = 'cool_image.png'
     # The file isn't actually an image, but that's not important
@@ -298,7 +305,7 @@ def test_link_to_image_with_params(use_temp_dir, wiki_mock):
     wiki_mock.attach_file.assert_called_once()
 
 
-def test_jira_macro(use_temp_dir):
+def test_jira_macro():
     doc_path = 'new_doc.md'
     with open(doc_path, mode='w', encoding='utf-8') as doc_file:
         print('Bash example using ${SOME_VARIABLE}', file=doc_file)
@@ -309,8 +316,7 @@ def test_jira_macro(use_temp_dir):
     assert output == r'Bash example using $\{SOME_VARIABLE\}' + '\n'
 
 
-def test_rst_note(use_temp_dir):
-    """This documents the behaviour that will get fixed in #76"""
+def test_rst_note():
     doc_path = 'new_doc.rst'
     contents = """This is some text
 
@@ -325,11 +331,44 @@ And some more text"""
     converter = ContentConverter(wiki_mock, GH_ROOT, REPO_NAME)
     output = converter.convert_file_contents(doc_path)
 
+    # Confluence's `{note}` looks a lot like a warning, so we use `{info}`
     expected_output = """This is some text
 
-Note
+{info}
 
 This is a note
+
+{info}
+
+And some more text
+"""
+
+    assert output == expected_output
+
+
+def test_rst_warning():
+    doc_path = 'new_doc.rst'
+    contents = """This is some text
+
+.. warning::
+
+   This is a warning
+
+And some more text"""
+    with open(doc_path, mode='w', encoding='utf-8') as doc_file:
+        print(contents, file=doc_file)
+
+    converter = ContentConverter(wiki_mock, GH_ROOT, REPO_NAME)
+    output = converter.convert_file_contents(doc_path)
+
+    # Confluence's `{warning}` looks a lot like an error, so we use `{note}`
+    expected_output = """This is some text
+
+{note}
+
+This is a warning
+
+{note}
 
 And some more text
 """

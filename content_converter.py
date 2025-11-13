@@ -7,6 +7,7 @@ import re
 import atlassian
 import pypandoc
 
+import constants
 
 # GENERAL NOTE about the regex patterns: we want them to be non-greedy
 # https://docs.python.org/3/howto/regex.html#greedy-versus-non-greedy
@@ -60,7 +61,15 @@ class ContentConverter:
     def convert_file_contents(self, file_path: str) -> str:
         self.files_to_attach_to_last_page = []
 
-        formated_file_contents = pypandoc.convert_file(file_path, 'jira')
+        _, file_ext = os.path.splitext(file_path)
+
+        filters = []
+        if file_ext == '.rst':
+            filters = [f'{constants.PANDOC_FILTERS_FOLDER}/rst_note_warning.lua']
+
+        formated_file_contents = pypandoc.convert_file(
+            file_path, 'jira', filters=filters
+        )
 
         return self._replace_relative_links(file_path, formated_file_contents)
 
