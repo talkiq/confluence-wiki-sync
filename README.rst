@@ -38,7 +38,7 @@ two commits and get a list of modified files.
             fetch-depth: 2
 
         - name: Get modified files
-          run: echo "MODIFIED_FILES=`git diff HEAD^ --name-only | xargs`" >> $GITHUB_ENV
+          run: echo "MODIFIED_FILES=$(git diff HEAD^ --name-only | tr '\n' '|')" >> $GITHUB_ENV
 
         - name: Wiki Sync
           uses: talkiq/confluence-wiki-sync@v1
