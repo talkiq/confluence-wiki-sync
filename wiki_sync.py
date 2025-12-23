@@ -93,7 +93,10 @@ def sync_files(files: list[str]) -> bool:
 
         try:
             formatted_content = converter.convert_file_contents(file_path)
-            content = read_only_warning + formatted_content
+            if os.environ.get('INPUT_ADD-WARNING-BANNER', 'true').lower() == 'true':
+                content = read_only_warning + formatted_content
+            else:
+                content = formatted_content
         except Exception:
             logging.exception('Error converting file %s:', file_path)
             success = False
