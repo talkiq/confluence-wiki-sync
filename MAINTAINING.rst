@@ -34,8 +34,7 @@ tag.
 
 You can click "Generate release notes", and GitHub will generate its own
 version of the git log. At the top, add your description of the release (the
-first part of the git tag). Note that GitHub will use the first line as the
-title of the release.
+first part of the git tag).
 
 Publish the release.
 
