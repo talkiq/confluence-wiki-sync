@@ -4,6 +4,10 @@ branding:
   icon: upload-cloud
   color: purple
 inputs:
+  add-warning-banner:
+    description: Add a read-only warning banner to synced pages
+    required: false
+    default: 'true'
   default-git-branch:
     description: The git branch that will be used for links to GitHub
     required: false
@@ -12,10 +16,6 @@ inputs:
     description: Space-delimited list of folders to ignore when considering which files to upload
     required: false
     default: ''
-  add-warning-banner:
-    description: Add a read-only warning banner to synced pages
-    required: false
-    default: 'true'
   modified-files:
     description: Pipe(`|`)-delimited list of files that have been modified (or added or deleted)
     required: true
