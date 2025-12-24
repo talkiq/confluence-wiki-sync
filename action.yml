@@ -4,6 +4,10 @@ branding:
   icon: upload-cloud
   color: purple
 inputs:
+  add-warning-banner:
+    description: Add a read-only warning banner to synced pages
+    required: false
+    default: 'true'
   default-git-branch:
     description: The git branch that will be used for links to GitHub
     required: false
