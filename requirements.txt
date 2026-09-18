@@ -1,2 +1,2 @@
-atlassian-python-api==4.0.7
+atlassian-python-api==5.0.5
 pypandoc==1.17
